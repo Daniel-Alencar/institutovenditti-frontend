@@ -1,0 +1,77 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║       🔐 ACESSO RÁPIDO AO PAINEL ADMINISTRATIVO 🔐           ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+📋 PASSO A PASSO:
+
+1️⃣  Inicie o servidor:
+    npm run dev
+
+2️⃣  Acesse no navegador:
+    http://localhost:3000/?admin=true
+
+3️⃣  Digite a senha:
+    admin123
+
+✅ PRONTO! Você está no painel administrativo!
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 O QUE VOCÊ VAI VER:
+
+  📊 VISÃO GERAL
+     • Total de usuários
+     • Total de diagnósticos
+     • Total de indicações
+     • Ações rápidas
+
+  👥 USUÁRIOS
+     • Lista completa de cadastrados
+     • Busca e filtros
+     • Informações de contato
+
+  📋 DIAGNÓSTICOS
+     • Histórico completo
+     • Respostas dos questionários
+     • Relatórios gerados
+
+  💼 INDICAÇÕES
+     • Lista de indicações
+     • Status de envio
+     • Exportação Excel
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔑 ALTERAR SENHA:
+
+Edite o arquivo .env.local:
+VITE_ADMIN_PASSWORD=sua_senha_aqui
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚪 FAZER LOGOUT:
+
+Clique no botão "Sair" no canto superior direito
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 DOCUMENTAÇÃO COMPLETA:
+
+  • COMO_ACESSAR_ADMIN.md  → Guia detalhado
+  • MANUAL_DO_SISTEMA.md   → Manual completo
+  • .env.local             → Configurações
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️  IMPORTANTE:
+
+Os dados mostrados no admin são DEMO (zeros) porque o banco
+de dados ainda não foi configurado. A interface está 100%
+pronta para exibir dados reais quando você conectar o banco!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Sistema validado e pronto para uso!

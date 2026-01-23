@@ -1,0 +1,173 @@
+{
+  "id": "102019a692bf2af7d86ac18adadd8175028",
+  "version": "102019a692bf2af7c15aac320bb66b499a8",
+  "schema": {
+    "name": "user_data",
+    "description": "Stores information about users of the system.",
+    "fields": [
+      {
+        "name": "id",
+        "description": "Unique identifier for each data of this entity.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal system identifier."
+        }
+      },
+      {
+        "name": "data_creator",
+        "description": "id of the user who creates the record",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal audit trail."
+        }
+      },
+      {
+        "name": "data_updater",
+        "description": "id of the user who updates the record",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal audit trail."
+        }
+      },
+      {
+        "name": "create_time",
+        "description": "create time in timestamp unix",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal audit trail."
+        },
+        "format": "timestamp"
+      },
+      {
+        "name": "update_time",
+        "description": "update time in timestamp unix",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal audit trail."
+        },
+        "format": "timestamp"
+      },
+      {
+        "name": "full_name",
+        "description": "The full name of the user.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 3,
+          "reason": "Personally Identifiable Information (PII)."
+        }
+      },
+      {
+        "name": "email",
+        "description": "The user's email address.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 3,
+          "reason": "Personally Identifiable Information (PII) and contact detail."
+        },
+        "format": "email"
+      },
+      {
+        "name": "whatsapp",
+        "description": "The user's WhatsApp phone number.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 3,
+          "reason": "Personally Identifiable Information (PII) and contact detail."
+        }
+      },
+      {
+        "name": "city",
+        "description": "The city where the user resides.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "General location data for analytics."
+        },
+        "nullable": true
+      },
+      {
+        "name": "state",
+        "description": "The state or province where the user resides.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "General location data for analytics."
+        },
+        "nullable": true
+      },
+      {
+        "name": "referral_friend_name",
+        "description": "Name of the friend who referred the user.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 3,
+          "reason": "Contains PII of another individual."
+        },
+        "nullable": true
+      },
+      {
+        "name": "referral_friend_whatsapp",
+        "description": "WhatsApp number of the friend who referred the user.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 3,
+          "reason": "Contains PII of another individual."
+        },
+        "nullable": true
+      }
+    ],
+    "indexes": [
+      {
+        "fields": [
+          "id"
+        ],
+        "unique": true,
+        "primary": true,
+        "order": false
+      },
+      {
+        "fields": [
+          "data_creator"
+        ],
+        "order": false
+      },
+      {
+        "fields": [
+          "data_updater"
+        ],
+        "order": false
+      },
+      {
+        "fields": [
+          "email"
+        ],
+        "unique": true,
+        "order": false
+      },
+      {
+        "fields": [
+          "whatsapp"
+        ],
+        "order": false
+      }
+    ]
+  },
+  "task": {
+    "id": "6910ae83163c36af3312ed31",
+    "root": "6910a741b1b70bd284b566f2",
+    "project": "6910a741b1b70bd284b566f1",
+    "user": "d8516350-d001-70af-2afb-f584c306d959"
+  },
+  "namespace": {
+    "id": "01987547fc6c72ecb453bd2736bd4ea0",
+    "tenant": 2,
+    "name": "global-1",
+    "default": true
+  },
+  "revision": 1
+}

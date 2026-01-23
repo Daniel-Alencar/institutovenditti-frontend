@@ -1,0 +1,187 @@
+{
+  "id": "102019a692bf2af7df792148191e7eb48e8",
+  "version": "102019a692bf2af7c15aac320bb66b499a8",
+  "schema": {
+    "name": "advertisement",
+    "description": "Stores information for banner advertisements displayed in the system.",
+    "fields": [
+      {
+        "name": "id",
+        "description": "Unique identifier for each data of this entity.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal system identifier."
+        }
+      },
+      {
+        "name": "data_creator",
+        "description": "id of the user who creates the record",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal audit trail."
+        }
+      },
+      {
+        "name": "data_updater",
+        "description": "id of the user who updates the record",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal audit trail."
+        }
+      },
+      {
+        "name": "create_time",
+        "description": "create time in timestamp unix",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal audit trail."
+        },
+        "format": "timestamp"
+      },
+      {
+        "name": "update_time",
+        "description": "update time in timestamp unix",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal audit trail."
+        },
+        "format": "timestamp"
+      },
+      {
+        "name": "title",
+        "description": "The title of the advertisement.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 1,
+          "reason": "Publicly displayed content."
+        }
+      },
+      {
+        "name": "description",
+        "description": "A brief description of the advertisement.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 1,
+          "reason": "Publicly displayed content."
+        },
+        "nullable": true
+      },
+      {
+        "name": "image_url",
+        "description": "URL of the advertisement's banner image.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 1,
+          "reason": "Publicly displayed content."
+        }
+      },
+      {
+        "name": "link_url",
+        "description": "The destination URL when the ad is clicked.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 1,
+          "reason": "Publicly displayed content."
+        }
+      },
+      {
+        "name": "position",
+        "description": "The display position of the banner (1-4).",
+        "type": 2,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal system logic data."
+        },
+        "taxonomy": {
+          "category": "advertisement_management",
+          "subject": "display_logic"
+        },
+        "minimum": 1,
+        "numeric": "int"
+      },
+      {
+        "name": "is_active",
+        "description": "Whether the advertisement is currently active and should be displayed.",
+        "type": 3,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal system logic data."
+        }
+      },
+      {
+        "name": "start_date",
+        "description": "The date and time when the ad campaign starts.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal campaign management data."
+        },
+        "format": "timestamp"
+      },
+      {
+        "name": "end_date",
+        "description": "The date and time when the ad campaign ends. Null for indefinite.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal campaign management data."
+        },
+        "nullable": true,
+        "format": "timestamp"
+      }
+    ],
+    "indexes": [
+      {
+        "fields": [
+          "id"
+        ],
+        "unique": true,
+        "primary": true,
+        "order": false
+      },
+      {
+        "fields": [
+          "data_creator"
+        ],
+        "order": false
+      },
+      {
+        "fields": [
+          "data_updater"
+        ],
+        "order": false
+      },
+      {
+        "fields": [
+          "is_active"
+        ],
+        "order": false
+      },
+      {
+        "fields": [
+          "is_active",
+          "position"
+        ],
+        "order": false
+      }
+    ]
+  },
+  "task": {
+    "id": "6910ae83163c36af3312ed31",
+    "root": "6910a741b1b70bd284b566f2",
+    "project": "6910a741b1b70bd284b566f1",
+    "user": "d8516350-d001-70af-2afb-f584c306d959"
+  },
+  "namespace": {
+    "id": "01987547fc6c72ecb453bd2736bd4ea0",
+    "tenant": 2,
+    "name": "global-1",
+    "default": true
+  },
+  "revision": 1
+}

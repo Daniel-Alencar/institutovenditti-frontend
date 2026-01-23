@@ -1,0 +1,158 @@
+{
+  "id": "102019a692bf2af7e48b26ab90a341f7280",
+  "version": "102019a692bf2af7c15aac320bb66b499a8",
+  "schema": {
+    "name": "referral_notification",
+    "description": "Tracks notifications sent for user referrals.",
+    "fields": [
+      {
+        "name": "id",
+        "description": "Unique identifier for each data of this entity.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal system identifier."
+        }
+      },
+      {
+        "name": "data_creator",
+        "description": "id of the user who creates the record",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal audit trail."
+        }
+      },
+      {
+        "name": "data_updater",
+        "description": "id of the user who updates the record",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal audit trail."
+        }
+      },
+      {
+        "name": "create_time",
+        "description": "create time in timestamp unix",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal audit trail."
+        },
+        "format": "timestamp"
+      },
+      {
+        "name": "update_time",
+        "description": "update time in timestamp unix",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal audit trail."
+        },
+        "format": "timestamp"
+      },
+      {
+        "name": "referred_by_user_id",
+        "description": "The ID of the user who made the referral.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 3,
+          "reason": "Links to a specific user's PII."
+        }
+      },
+      {
+        "name": "friend_name",
+        "description": "The name of the friend who was referred.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 3,
+          "reason": "Contains PII of the referred individual."
+        }
+      },
+      {
+        "name": "friend_whatsapp",
+        "description": "The WhatsApp number of the friend who was referred.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 3,
+          "reason": "Contains PII of the referred individual."
+        }
+      },
+      {
+        "name": "notification_sent",
+        "description": "Flag indicating if the notification has been sent.",
+        "type": 3,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal system status."
+        }
+      },
+      {
+        "name": "sent_at",
+        "description": "The timestamp when the notification was sent.",
+        "type": 1,
+        "compliance": {
+          "confidentiality": 2,
+          "reason": "Internal system audit trail."
+        },
+        "nullable": true,
+        "format": "timestamp"
+      }
+    ],
+    "indexes": [
+      {
+        "fields": [
+          "id"
+        ],
+        "unique": true,
+        "primary": true,
+        "order": false
+      },
+      {
+        "fields": [
+          "data_creator"
+        ],
+        "order": false
+      },
+      {
+        "fields": [
+          "data_updater"
+        ],
+        "order": false
+      },
+      {
+        "fields": [
+          "referred_by_user_id"
+        ],
+        "order": false
+      }
+    ],
+    "relations": [
+      {
+        "referencing_fields": [
+          "referred_by_user_id"
+        ],
+        "referenced_entity": {
+          "name": "user_data"
+        },
+        "referenced_fields": [
+          "id"
+        ]
+      }
+    ]
+  },
+  "task": {
+    "id": "6910ae83163c36af3312ed31",
+    "root": "6910a741b1b70bd284b566f2",
+    "project": "6910a741b1b70bd284b566f1",
+    "user": "d8516350-d001-70af-2afb-f584c306d959"
+  },
+  "namespace": {
+    "id": "01987547fc6c72ecb453bd2736bd4ea0",
+    "tenant": 2,
+    "name": "global-1",
+    "default": true
+  },
+  "revision": 1
+}
