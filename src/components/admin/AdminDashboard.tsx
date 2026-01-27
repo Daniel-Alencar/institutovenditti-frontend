@@ -205,13 +205,15 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
+        {/* 
         <Alert className="mb-6 border-blue-200 bg-blue-50">
           <AlertCircle className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-900">
             <strong>Importante:</strong> Conecte o banco de dados para visualizar dados reais.
             Atualmente mostrando interface de demonstração.
           </AlertDescription>
-        </Alert>
+        </Alert> 
+        */}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-10 mb-6 h-auto">
@@ -946,7 +948,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 <EmptyState
                   icon={<FileText className="h-12 w-12 text-zinc-400" />}
                   title="Nenhum diagnóstico encontrado"
-                  description="Os diagnósticos aparecerão aqui quando o banco de dados estiver conectado."
+                  description=""
                 />
               </CardContent>
             </Card>
