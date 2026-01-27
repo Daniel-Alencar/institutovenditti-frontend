@@ -13,8 +13,8 @@ function Root() {
 			<ErrorBoundary tagName="main" className="flex-1">
 				<Outlet />
 			</ErrorBoundary>
-			<TanStackRouterDevtools position="bottom-right" />
-			<FloatingBanner position="bottom-left" />
+			{/* <TanStackRouterDevtools position="bottom-right" /> */}
+			{/* <FloatingBanner position="bottom-left" /> */}
 		</div>
 	);
 }
