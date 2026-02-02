@@ -49,8 +49,6 @@ export function ReportPreview({
     if (hasRunRef.current) return;
     hasRunRef.current = true;
     
-    console.log('🔥 useEffect executado');
-    
     const generateReport = async () => {
       try {
         const { generateAIAnalysis } = await import('@/lib/ai-analysis');
@@ -63,7 +61,6 @@ export function ReportPreview({
         });
 
         setAiReport(report);
-        setIsGenerating(false);
 
         await diagnosticsService.create({
           userId: userData.email,
@@ -84,9 +81,7 @@ export function ReportPreview({
             referredWhatsapp: userData.referralWhatsapp,
           });
         }
-
-        await handleSendWhatsApp();
-        await handleSendEmail();
+        setIsGenerating(false);
 
       } catch (error) {
         console.error('Erro ao gerar relatório:', error);
@@ -98,6 +93,19 @@ export function ReportPreview({
 
     generateReport();
   }, []);
+
+  useEffect(() => {
+
+    const sendCommunications = async () => {
+      await handleSendWhatsApp();
+      await handleSendEmail();
+    };
+    
+    if (!isGenerating) {
+      sendCommunications();
+    }
+
+  }, [isGenerating]);
 
 
   const generateMockReport = () => {
@@ -254,7 +262,7 @@ export function ReportPreview({
       // Send email (currently simulated)
       await sendDiagnosticEmail({
         to: userData.email,
-        subject: `Seu Diagnóstico Jurídico - ${area.name}`,
+        subject: `Seu Diagnóstico teste - ${area.name}`,
         htmlContent,
         pdfAttachment: pdfBlob,
         userData
@@ -385,7 +393,7 @@ export function ReportPreview({
             </div>
             <div>
               <div className="text-2xl font-bold text-zinc-900">{urgencyLabel}</div>
-              <div className="text-sm text-zinc-600">Nível de Urgência</div>
+              <div className="text-sm handleSendEmail();text-zinc-600">Nível de Urgência</div>
             </div>
           </div>
         </CardContent>
@@ -507,7 +515,15 @@ export function ReportPreview({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
-              <Button onClick={handleDownloadPDF} variant="outline" className="w-full" disabled={isDownloadingPDF}>
+              <Button 
+                onClick={() => {
+                  handleDownloadPDF();
+                  
+                }} 
+                variant="outline" 
+                className="w-full" 
+                disabled={isDownloadingPDF}
+              >
                 {isDownloadingPDF ? <Loader2 className="mr-2 animate-spin" /> : <Download className="mr-2" />}
                 {isDownloadingPDF ? 'Gerando PDF...' : 'Baixar PDF'}
               </Button>
