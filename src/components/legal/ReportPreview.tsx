@@ -100,7 +100,7 @@ export function ReportPreview({
       await handleSendWhatsApp();
       await handleSendEmail();
     };
-    
+
     if (!isGenerating) {
       sendCommunications();
     }
@@ -262,7 +262,7 @@ export function ReportPreview({
       // Send email (currently simulated)
       await sendDiagnosticEmail({
         to: userData.email,
-        subject: `Seu Diagnóstico teste - ${area.name}`,
+        subject: `Seu Diagnóstico Jurídico - ${area.name}`,
         htmlContent,
         pdfAttachment: pdfBlob,
         userData
