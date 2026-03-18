@@ -275,6 +275,52 @@ export const diagnosticsService = {
     }
   },
 
+  // Retorna o diagnóstico mais recente de um usuário (inclui urgency_level e pdf_url)
+  getLatestByUser: async (userId: string): Promise<DiagnosticRecord | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('diagnostics')
+        .select('id, user_id, urgency_level, pdf_url, total_score, created_at, area')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) return null;
+      return toCamelCase<DiagnosticRecord>(data);
+    } catch (error) {
+      console.error('Error loading latest user diagnostic:', error);
+      return null;
+    }
+  },
+
+  // Retorna todos os diagnósticos mais recentes indexados por user_id
+  getLatestPerUser: async (): Promise<Record<string, DiagnosticRecord>> => {
+    try {
+      // Busca todos os diagnósticos ordenados por data (mais recente primeiro)
+      const { data, error } = await supabase
+        .from('diagnostics')
+        .select('id, user_id, urgency_level, pdf_url, total_score, created_at, area')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Mantém apenas o mais recente por usuário
+      const latestPerUser: Record<string, DiagnosticRecord> = {};
+      for (const row of (data || [])) {
+        const record = toCamelCase<DiagnosticRecord>(row);
+        if (!latestPerUser[record.userId]) {
+          latestPerUser[record.userId] = record;
+        }
+      }
+      return latestPerUser;
+    } catch (error) {
+      console.error('Error loading latest diagnostics per user:', error);
+      return {};
+    }
+  },
+
   updatePdfUrl: async (diagnosticId: string, pdfUrl: string): Promise<DiagnosticRecord | null> => {
     try {
       const { data, error } = await supabase

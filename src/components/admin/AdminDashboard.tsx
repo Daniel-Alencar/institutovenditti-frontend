@@ -139,9 +139,10 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   // Analytics state
   const [analyticsStats, setAnalyticsStats] = useState<any>(null);
 
-  // Users and Referrals state
+  // Users, Referrals and Diagnostics state
   const [users, setUsers] = useState<any[]>([]);
   const [referrals, setReferrals] = useState<any[]>([]);
+  const [allDiagnostics, setAllDiagnostics] = useState<any[]>([]);
 
   // Load data on mount
   useEffect(() => {
@@ -158,11 +159,13 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       const announcementsData = await announcementsService.getAll();
       setAnnouncements(announcementsData);
 
-      // Load users and referrals
+      // Load users, referrals and diagnostics
       const usersData = await usersService.getAll();
       setUsers(usersData);
       const referralsData = await referralsService.getAll();
       setReferrals(referralsData);
+      const diagnosticsData = await diagnosticsService.getAll();
+      setAllDiagnostics(diagnosticsData);
 
       // Load stats
       const diagnosticStats = await diagnosticsService.getStats();
@@ -910,13 +913,19 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                         </TableRow>
                       ) : (
                         users.map((user) => {
-                          // Get user's diagnostics to find urgency level and PDF URL
-                          const userDiagnostics = diagnosticsService.getByUser(user.id);
+                          // Busca o diagnóstico mais recente desse usuário
+                          const latestDiagnostic = allDiagnostics
+                            .filter(d => d.userId === user.id)
+                            .sort((a: any, b: any) =>
+                              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                            )[0];
 
-                          // Default, será atualizado com dados reais
-                          let urgencyLevel = 'medium';
-                          // Será preenchido com dados reais
-                          let pdfUrl = null;
+                          // Usa urgência do diagnóstico mais recente, ou do campo direto no usuário, ou 'medium' como fallback
+                          const urgencyLevel: 'high' | 'medium' | 'low' =
+                            latestDiagnostic?.urgencyLevel ?? user.urgencyLevel ?? 'medium';
+
+                          // URL do PDF do diagnóstico mais recente
+                          const pdfUrl: string | null = latestDiagnostic?.pdfUrl ?? null;
                           
                           return (
                             <TableRow key={user.id}>

@@ -62,7 +62,8 @@ export function ReportPreview({
 
         setAiReport(report);
 
-        await diagnosticsService.create({
+        // Salva o diagnóstico no banco de dados
+        const createdDiagnostic = await diagnosticsService.create({
           userId: userData.email,
           area,
           responses,
@@ -71,6 +72,38 @@ export function ReportPreview({
           urgencyLevel: score.urgencyLevel,
           aiReport: report,
         });
+
+        // Gera o PDF e faz upload para o Supabase Storage
+        try {
+          const { generateLegalReportPDF } = await import('@/lib/pdf-generator');
+          const { uploadPDFToBlob } = await import('@/lib/blob-storage');
+
+          const pdfBlob = await generateLegalReportPDF({
+            area,
+            userData,
+            aiReport: report,
+            totalScore: score.totalPoints,
+            urgencyLevel: score.urgencyLevel,
+          });
+
+          const safeName = userData.fullName
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, '_')
+            .toLowerCase();
+          const dateStr = new Date().toISOString().split('T')[0];
+          const filename = `diagnostico_${area.name.toLowerCase().replace(/\s+/g, '_')}_${safeName}_${dateStr}_${Date.now()}.pdf`;
+
+          const pdfUrl = await uploadPDFToBlob(pdfBlob, filename);
+
+          // Atualiza o diagnóstico com a URL do PDF
+          if (createdDiagnostic?.id) {
+            await diagnosticsService.updatePdfUrl(createdDiagnostic.id, pdfUrl);
+          }
+        } catch (pdfError) {
+          // Falha no PDF não impede o fluxo principal
+          console.error('Erro ao gerar/enviar PDF:', pdfError);
+        }
 
         if (userData.referralName && userData.referralWhatsapp) {
           await referralsService.create({

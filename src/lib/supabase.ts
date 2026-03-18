@@ -64,6 +64,8 @@ export interface Database {
           email: string;
           whatsapp: string;
           legal_area: string;
+          city: string | null;
+          state: string | null;
           responses: any;
           created_at: string;
         };
@@ -73,6 +75,8 @@ export interface Database {
           email: string;
           whatsapp: string;
           legal_area: string;
+          city?: string | null;
+          state?: string | null;
           responses?: any;
           created_at?: string;
         };
@@ -82,6 +86,8 @@ export interface Database {
           email?: string;
           whatsapp?: string;
           legal_area?: string;
+          city?: string | null;
+          state?: string | null;
           responses?: any;
           created_at?: string;
         };
@@ -96,6 +102,7 @@ export interface Database {
           total_score: number;
           urgency_level: 'low' | 'medium' | 'high';
           ai_report: string;
+          pdf_url: string | null;
           created_at: string;
         };
         Insert: {
@@ -107,6 +114,7 @@ export interface Database {
           total_score: number;
           urgency_level: 'low' | 'medium' | 'high';
           ai_report: string;
+          pdf_url?: string | null;
           created_at?: string;
         };
         Update: {
@@ -118,6 +126,7 @@ export interface Database {
           total_score?: number;
           urgency_level?: 'low' | 'medium' | 'high';
           ai_report?: string;
+          pdf_url?: string | null;
           created_at?: string;
         };
       };
