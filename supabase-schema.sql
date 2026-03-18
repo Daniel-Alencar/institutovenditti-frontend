@@ -485,3 +485,243 @@ EXECUTE FUNCTION update_user_urgency_level();
 -- ALTER TABLE users DROP COLUMN IF EXISTS urgency_level;
 -- DROP VIEW IF EXISTS users_with_diagnostics;
 -- DROP FUNCTION IF EXISTS update_user_urgency_level();
+
+
+
+
+-- ============================================================================
+-- SUPABASE STORAGE + PERMISSÕES FALTANTES
+-- Execute este script no SQL Editor do seu projeto Supabase
+-- ============================================================================
+
+-- ============================================================================
+-- 1. BUCKET DE ARMAZENAMENTO DE PDFs
+-- ============================================================================
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'pdfs',
+  'pdfs',
+  true,
+  10485760,
+  ARRAY['application/pdf']
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================================
+-- 2. POLÍTICAS DE ACESSO AO STORAGE (bucket "pdfs")
+-- ============================================================================
+DROP POLICY IF EXISTS "Allow public read pdfs"   ON storage.objects;
+DROP POLICY IF EXISTS "Allow public insert pdfs" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public update pdfs" ON storage.objects;
+
+CREATE POLICY "Allow public read pdfs"   ON storage.objects FOR SELECT USING (bucket_id = 'pdfs');
+CREATE POLICY "Allow public insert pdfs" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'pdfs');
+CREATE POLICY "Allow public update pdfs" ON storage.objects FOR UPDATE USING (bucket_id = 'pdfs');
+
+-- ============================================================================
+-- 3. PERMISSÃO UPDATE NA TABELA diagnostics
+-- ============================================================================
+DROP POLICY IF EXISTS "Allow public update diagnostics" ON diagnostics;
+CREATE POLICY "Allow public update diagnostics" ON diagnostics
+  FOR UPDATE USING (true);
+
+-- ============================================================================
+-- 4. COLUNAS NECESSÁRIAS (seguro executar mesmo se já existirem)
+-- ============================================================================
+ALTER TABLE diagnostics ADD COLUMN IF NOT EXISTS pdf_url TEXT;
+ALTER TABLE users       ADD COLUMN IF NOT EXISTS city          TEXT;
+ALTER TABLE users       ADD COLUMN IF NOT EXISTS state         TEXT;
+ALTER TABLE users       ADD COLUMN IF NOT EXISTS urgency_level TEXT
+  CHECK (urgency_level IN ('low', 'medium', 'high'));
+
+CREATE INDEX IF NOT EXISTS idx_diagnostics_pdf_url ON diagnostics(pdf_url);
+CREATE INDEX IF NOT EXISTS idx_users_location      ON users(city, state);
+CREATE INDEX IF NOT EXISTS idx_users_urgency       ON users(urgency_level);
+
+-- ============================================================================
+-- 5. VIEW: usuários com diagnóstico mais recente
+-- FIX: DROP obrigatório antes de recriar pois a estrutura de colunas mudou
+-- ============================================================================
+DROP VIEW IF EXISTS users_with_diagnostics;
+
+CREATE VIEW users_with_diagnostics AS
+SELECT
+  u.id,
+  u.full_name,
+  u.email,
+  u.whatsapp,
+  u.legal_area,
+  u.city,
+  u.state,
+  u.urgency_level,
+  u.created_at,
+  d.id           AS diagnostic_id,
+  d.total_score,
+  d.pdf_url,
+  d.created_at   AS diagnostic_date
+FROM users u
+LEFT JOIN LATERAL (
+  SELECT id, total_score, pdf_url, created_at
+  FROM diagnostics
+  WHERE user_id = u.id
+  ORDER BY created_at DESC
+  LIMIT 1
+) d ON true
+ORDER BY u.created_at DESC;
+
+-- ============================================================================
+-- 6. TRIGGER: sincroniza urgency_level do usuário ao criar diagnóstico
+-- ============================================================================
+CREATE OR REPLACE FUNCTION update_user_urgency_level()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE users
+  SET urgency_level = NEW.urgency_level
+  WHERE id = NEW.user_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_user_urgency ON diagnostics;
+CREATE TRIGGER trigger_update_user_urgency
+  AFTER INSERT ON diagnostics
+  FOR EACH ROW
+  EXECUTE FUNCTION update_user_urgency_level();
+
+-- ============================================================================
+-- VERIFICAÇÃO (descomente para checar após executar)
+-- ============================================================================
+-- SELECT id, name, public FROM storage.buckets WHERE id = 'pdfs';
+-- SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'diagnostics' ORDER BY ordinal_position;
+-- SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'users' ORDER BY ordinal_position;
+-- SELECT * FROM users_with_diagnostics LIMIT 5;
+
+
+
+-- ============================================================================
+-- SUPABASE STORAGE + PERMISSÕES
+-- Execute este script no SQL Editor do seu projeto Supabase
+-- ============================================================================
+
+-- ============================================================================
+-- 1. BUCKETS DE ARMAZENAMENTO
+-- ============================================================================
+
+-- Bucket para PDFs das análises jurídicas
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'pdfs', 'pdfs', true,
+  10485760,                    -- 10 MB
+  ARRAY['application/pdf']
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Bucket para imagens de banner dos anúncios
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'banners', 'banners', true,
+  5242880,                     -- 5 MB
+  ARRAY['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================================
+-- 2. POLÍTICAS DE ACESSO AO STORAGE
+-- ============================================================================
+
+-- PDFs
+DROP POLICY IF EXISTS "Allow public read pdfs"   ON storage.objects;
+DROP POLICY IF EXISTS "Allow public insert pdfs" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public update pdfs" ON storage.objects;
+
+CREATE POLICY "Allow public read pdfs"   ON storage.objects FOR SELECT USING (bucket_id = 'pdfs');
+CREATE POLICY "Allow public insert pdfs" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'pdfs');
+CREATE POLICY "Allow public update pdfs" ON storage.objects FOR UPDATE USING (bucket_id = 'pdfs');
+
+-- Banners
+DROP POLICY IF EXISTS "Allow public read banners"   ON storage.objects;
+DROP POLICY IF EXISTS "Allow public insert banners" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public update banners" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public delete banners" ON storage.objects;
+
+CREATE POLICY "Allow public read banners"   ON storage.objects FOR SELECT USING (bucket_id = 'banners');
+CREATE POLICY "Allow public insert banners" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'banners');
+CREATE POLICY "Allow public update banners" ON storage.objects FOR UPDATE USING (bucket_id = 'banners');
+CREATE POLICY "Allow public delete banners" ON storage.objects FOR DELETE USING (bucket_id = 'banners');
+
+-- ============================================================================
+-- 3. PERMISSÃO UPDATE NA TABELA diagnostics (para salvar pdf_url)
+-- ============================================================================
+DROP POLICY IF EXISTS "Allow public update diagnostics" ON diagnostics;
+CREATE POLICY "Allow public update diagnostics" ON diagnostics
+  FOR UPDATE USING (true);
+
+-- ============================================================================
+-- 4. COLUNAS NECESSÁRIAS (seguro executar mesmo se já existirem)
+-- ============================================================================
+ALTER TABLE diagnostics ADD COLUMN IF NOT EXISTS pdf_url TEXT;
+ALTER TABLE users       ADD COLUMN IF NOT EXISTS city          TEXT;
+ALTER TABLE users       ADD COLUMN IF NOT EXISTS state         TEXT;
+ALTER TABLE users       ADD COLUMN IF NOT EXISTS urgency_level TEXT
+  CHECK (urgency_level IN ('low', 'medium', 'high'));
+
+CREATE INDEX IF NOT EXISTS idx_diagnostics_pdf_url ON diagnostics(pdf_url);
+CREATE INDEX IF NOT EXISTS idx_users_location      ON users(city, state);
+CREATE INDEX IF NOT EXISTS idx_users_urgency       ON users(urgency_level);
+
+-- ============================================================================
+-- 5. VIEW: usuários com diagnóstico mais recente
+-- DROP obrigatório pois a estrutura de colunas mudou
+-- ============================================================================
+DROP VIEW IF EXISTS users_with_diagnostics;
+
+CREATE VIEW users_with_diagnostics AS
+SELECT
+  u.id,
+  u.full_name,
+  u.email,
+  u.whatsapp,
+  u.legal_area,
+  u.city,
+  u.state,
+  u.urgency_level,
+  u.created_at,
+  d.id           AS diagnostic_id,
+  d.total_score,
+  d.pdf_url,
+  d.created_at   AS diagnostic_date
+FROM users u
+LEFT JOIN LATERAL (
+  SELECT id, total_score, pdf_url, created_at
+  FROM diagnostics
+  WHERE user_id = u.id
+  ORDER BY created_at DESC
+  LIMIT 1
+) d ON true
+ORDER BY u.created_at DESC;
+
+-- ============================================================================
+-- 6. TRIGGER: sincroniza urgency_level do usuário ao criar diagnóstico
+-- ============================================================================
+CREATE OR REPLACE FUNCTION update_user_urgency_level()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE users
+  SET urgency_level = NEW.urgency_level
+  WHERE id = NEW.user_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_user_urgency ON diagnostics;
+CREATE TRIGGER trigger_update_user_urgency
+  AFTER INSERT ON diagnostics
+  FOR EACH ROW
+  EXECUTE FUNCTION update_user_urgency_level();
+
+-- ============================================================================
+-- VERIFICAÇÃO (descomente para checar após executar)
+-- ============================================================================
+-- SELECT id, name, public FROM storage.buckets WHERE id IN ('pdfs', 'banners');
+-- SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'diagnostics' ORDER BY ordinal_position;
+-- SELECT * FROM users_with_diagnostics LIMIT 5;

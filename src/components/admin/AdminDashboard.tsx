@@ -705,7 +705,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                     const newPos = (announcements.length + 1) as 1 | 2 | 3 | 4;
                     if (newPos <= 4) {
                       setEditingAnnouncement({
-                        id: Date.now().toString(),
+                        id: '__NEW__',
                         imageUrl: '',
                         validFrom: new Date().toISOString().split('T')[0],
                         validTo: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
@@ -780,22 +780,28 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
                       <div className="flex gap-2">
                         <Button onClick={async () => {
-                          // Check if it's a new announcement or existing
-                          const existingAnn = await announcementsService.getById(editingAnnouncement.id);
+                          try {
+                            const isNew = editingAnnouncement.id === '__NEW__';
 
-                          if (existingAnn) {
-                            // Update existing
-                            await announcementsService.update(editingAnnouncement.id, editingAnnouncement);
-                          } else {
-                            // Create new
-                            await announcementsService.create(editingAnnouncement);
+                            if (isNew) {
+                              // Cria novo anúncio — não envia id/createdAt/updatedAt
+                              const { id: _id, createdAt: _c, updatedAt: _u, ...payload } = editingAnnouncement;
+                              await announcementsService.create(payload);
+                            } else {
+                              // Atualiza anúncio existente
+                              const { id, createdAt: _c, updatedAt: _u, ...payload } = editingAnnouncement;
+                              await announcementsService.update(id, payload);
+                            }
+
+                            // Recarrega lista
+                            const announcementsData = await announcementsService.getAll();
+                            setAnnouncements(announcementsData);
+                            setEditingAnnouncement(null);
+                            alert('Anúncio salvo com sucesso!');
+                          } catch (err: any) {
+                            console.error('Erro ao salvar anúncio:', err);
+                            alert(`Erro ao salvar anúncio: ${err?.message ?? 'tente novamente.'}`);
                           }
-
-                          // Reload announcements
-                          const announcementsData = await announcementsService.getAll();
-                          setAnnouncements(announcementsData);
-                          setEditingAnnouncement(null);
-                          alert('Anúncio salvo com sucesso!');
                         }}>
                           <Save className="mr-2 h-4 w-4" />
                           Salvar Anúncio
