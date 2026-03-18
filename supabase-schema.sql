@@ -285,3 +285,203 @@ VALUES
    'https://instagram.com/exemplo4', 
    4)
 ON CONFLICT DO NOTHING;
+
+
+-- SCRIPT PARA CORREÇÃO DE PERMISSÕES NO SUPABASE
+-- Execute este script no SQL Editor do seu projeto Supabase
+
+-- 1. Garantir acesso ao schema public para usuários anônimos
+GRANT USAGE ON SCHEMA public TO anon;
+GRANT USAGE ON SCHEMA public TO authenticated;
+
+-- 2. Garantir permissões em todas as tabelas
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+
+-- 3. Habilitar RLS e criar políticas de acesso para cada tabela
+-- Isso garante que qualquer pessoa com a chave pública possa ler e escrever (ajuste conforme necessário para produção)
+
+-- Announcements
+ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Access" ON announcements;
+CREATE POLICY "Public Access" ON announcements FOR ALL USING (true) WITH CHECK (true);
+
+-- Users
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Access" ON users;
+CREATE POLICY "Public Access" ON users FOR ALL USING (true) WITH CHECK (true);
+
+-- Diagnostics
+ALTER TABLE diagnostics ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Access" ON diagnostics;
+CREATE POLICY "Public Access" ON diagnostics FOR ALL USING (true) WITH CHECK (true);
+
+-- Referrals
+ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Access" ON referrals;
+CREATE POLICY "Public Access" ON referrals FOR ALL USING (true) WITH CHECK (true);
+
+-- Terms
+ALTER TABLE terms ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Access" ON terms;
+CREATE POLICY "Public Access" ON terms FOR ALL USING (true) WITH CHECK (true);
+
+-- Analytics
+ALTER TABLE analytics ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Access" ON analytics;
+CREATE POLICY "Public Access" ON analytics FOR ALL USING (true) WITH CHECK (true);
+
+-- Analytics Summary
+ALTER TABLE analytics_summary ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Access" ON analytics_summary;
+CREATE POLICY "Public Access" ON analytics_summary FOR ALL USING (true) WITH CHECK (true);
+
+
+
+
+-- ============================================================================
+-- SUPABASE DATABASE SCHEMA UPDATES
+-- ============================================================================
+-- Execute este SQL no seu Supabase SQL Editor para atualizar as tabelas
+-- com suporte a armazenamento de PDFs e novos campos de usuário
+-- ============================================================================
+
+-- ============================================================================
+-- 1. ADICIONAR COLUNA pdf_url NA TABELA diagnostics
+-- ============================================================================
+-- Esta coluna armazenará a URL do PDF gerado e armazenado no Vercel Blob
+
+ALTER TABLE diagnostics 
+ADD COLUMN IF NOT EXISTS pdf_url TEXT;
+
+-- Criar índice para buscar diagnósticos por PDF URL
+CREATE INDEX IF NOT EXISTS idx_diagnostics_pdf_url ON diagnostics(pdf_url);
+
+-- ============================================================================
+-- 2. ADICIONAR COLUNAS city E state NA TABELA users
+-- ============================================================================
+-- Estas colunas armazenarão a localização do usuário (cidade e estado)
+
+ALTER TABLE users 
+ADD COLUMN IF NOT EXISTS city TEXT;
+
+ALTER TABLE users 
+ADD COLUMN IF NOT EXISTS state TEXT;
+
+-- Criar índice para buscar usuários por localização
+CREATE INDEX IF NOT EXISTS idx_users_location ON users(city, state);
+
+-- ============================================================================
+-- 3. ADICIONAR COLUNA urgency_level NA TABELA users (OPCIONAL)
+-- ============================================================================
+-- Esta coluna pode ser usada para armazenar o nível de urgência mais recente
+-- do usuário, para referência rápida na tabela de admin
+
+ALTER TABLE users 
+ADD COLUMN IF NOT EXISTS urgency_level TEXT CHECK (urgency_level IN ('low', 'medium', 'high'));
+
+-- Criar índice para buscar usuários por nível de urgência
+CREATE INDEX IF NOT EXISTS idx_users_urgency ON users(urgency_level);
+
+-- ============================================================================
+-- 4. ATUALIZAR COMENTÁRIOS DAS COLUNAS (DOCUMENTAÇÃO)
+-- ============================================================================
+-- Adicionar comentários para documentar as novas colunas
+
+COMMENT ON COLUMN diagnostics.pdf_url IS 'URL do PDF armazenado no Vercel Blob';
+COMMENT ON COLUMN users.city IS 'Cidade do usuário';
+COMMENT ON COLUMN users.state IS 'Estado (UF) do usuário';
+COMMENT ON COLUMN users.urgency_level IS 'Nível de urgência mais recente do usuário (low, medium, high)';
+
+-- ============================================================================
+-- 5. CRIAR VIEW PARA RELATÓRIO DE USUÁRIOS COM DIAGNÓSTICOS
+-- ============================================================================
+-- Esta view facilita a consulta de usuários com seus diagnósticos mais recentes
+
+CREATE OR REPLACE VIEW users_with_diagnostics AS
+SELECT 
+  u.id,
+  u.full_name,
+  u.email,
+  u.whatsapp,
+  u.legal_area,
+  u.city,
+  u.state,
+  u.created_at,
+  d.id as diagnostic_id,
+  d.urgency_level,
+  d.total_score,
+  d.pdf_url,
+  d.created_at as diagnostic_date
+FROM users u
+LEFT JOIN diagnostics d ON u.id = d.user_id
+ORDER BY u.created_at DESC, d.created_at DESC;
+
+-- ============================================================================
+-- 6. CRIAR FUNÇÃO PARA ATUALIZAR urgency_level DO USUÁRIO
+-- ============================================================================
+-- Esta função atualiza automaticamente o nível de urgência do usuário
+-- quando um novo diagnóstico é criado
+
+CREATE OR REPLACE FUNCTION update_user_urgency_level()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE users 
+  SET urgency_level = NEW.urgency_level
+  WHERE id = NEW.user_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Criar trigger para atualizar urgency_level
+DROP TRIGGER IF EXISTS trigger_update_user_urgency ON diagnostics;
+CREATE TRIGGER trigger_update_user_urgency
+AFTER INSERT ON diagnostics
+FOR EACH ROW
+EXECUTE FUNCTION update_user_urgency_level();
+
+-- ============================================================================
+-- 7. ATUALIZAR POLÍTICAS RLS (ROW LEVEL SECURITY)
+-- ============================================================================
+-- Garantir que as novas colunas sejam acessíveis com as políticas existentes
+
+-- A política existente "Allow public read access to users" já cobre as novas colunas
+-- A política existente "Allow public read access to diagnostics" já cobre a nova coluna pdf_url
+
+-- ============================================================================
+-- 8. VERIFICAR DADOS EXISTENTES
+-- ============================================================================
+-- Consultas para verificar se as alterações foram aplicadas corretamente
+
+-- Verificar estrutura da tabela users
+-- SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'users';
+
+-- Verificar estrutura da tabela diagnostics
+-- SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'diagnostics';
+
+-- Verificar view criada
+-- SELECT * FROM users_with_diagnostics LIMIT 10;
+
+-- ============================================================================
+-- NOTAS IMPORTANTES
+-- ============================================================================
+-- 1. As colunas adicionadas são NULLABLE por padrão
+-- 2. Os índices melhoram a performance de consultas
+-- 3. A view users_with_diagnostics facilita relatórios e queries
+-- 4. O trigger atualiza automaticamente o urgency_level do usuário
+-- 5. As políticas RLS existentes cobrem as novas colunas
+-- 6. Todos os dados existentes serão preservados (as colunas novas terão NULL)
+
+-- ============================================================================
+-- ROLLBACK (Se necessário desfazer as alterações)
+-- ============================================================================
+-- Descomente as linhas abaixo para reverter as alterações
+
+-- ALTER TABLE diagnostics DROP COLUMN IF EXISTS pdf_url;
+-- ALTER TABLE users DROP COLUMN IF EXISTS city;
+-- ALTER TABLE users DROP COLUMN IF EXISTS state;
+-- ALTER TABLE users DROP COLUMN IF EXISTS urgency_level;
+-- DROP VIEW IF EXISTS users_with_diagnostics;
+-- DROP FUNCTION IF EXISTS update_user_urgency_level();

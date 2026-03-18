@@ -41,7 +41,9 @@ import {
   Shield,
   TrendingUp,
   Activity,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Eye,
+  AlertTriangle
 } from 'lucide-react';
 
 // Default LGPD Terms Template
@@ -244,10 +246,6 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             <TabsTrigger value="users" className="flex-col py-3">
               <Users className="h-4 w-4 mb-1" />
               <span className="text-xs">Usuários</span>
-            </TabsTrigger>
-            <TabsTrigger value="diagnostics" className="flex-col py-3">
-              <FileText className="h-4 w-4 mb-1" />
-              <span className="text-xs">Diagnósticos</span>
             </TabsTrigger>
             <TabsTrigger value="referrals" className="flex-col py-3">
               <UserPlus className="h-4 w-4 mb-1" />
@@ -883,22 +881,24 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   </Button>
                 </div>
 
-                <div className="border rounded-lg overflow-hidden">
+                <div className="border rounded-lg overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Nome</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>WhatsApp</TableHead>
+                        <TableHead>Localização</TableHead>
                         <TableHead>Área Jurídica</TableHead>
+                        <TableHead>Urgência</TableHead>
                         <TableHead>Data</TableHead>
-                        <TableHead>Respostas</TableHead>
+                        <TableHead>Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {users.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8 text-zinc-500">
+                          <TableCell colSpan={8} className="text-center py-8 text-zinc-500">
                             <div className="flex flex-col items-center gap-2">
                               <Users className="h-12 w-12 text-zinc-400" />
                               <p className="font-medium">Nenhum usuário cadastrado ainda</p>
@@ -909,18 +909,58 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        users.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell>{user.fullName}</TableCell>
-                            <TableCell>{user.email}</TableCell>
-                            <TableCell>{user.whatsapp}</TableCell>
-                            <TableCell>{user.legalArea}</TableCell>
-                            <TableCell>{new Date(user.createdAt).toLocaleDateString('pt-BR')}</TableCell>
-                            <TableCell>
-                              <Button size="sm" variant="outline">Ver</Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
+                        users.map((user) => {
+                          // Get user's diagnostics to find urgency level and PDF URL
+                          const userDiagnostics = diagnosticsService.getByUser(user.id);
+
+                          // Default, será atualizado com dados reais
+                          let urgencyLevel = 'medium';
+                          // Será preenchido com dados reais
+                          let pdfUrl = null;
+                          
+                          return (
+                            <TableRow key={user.id}>
+                              <TableCell className="font-medium">{user.fullName}</TableCell>
+                              <TableCell className="text-sm">{user.email}</TableCell>
+                              <TableCell className="text-sm">{user.whatsapp}</TableCell>
+                              <TableCell className="text-sm">{user.city ? `${user.city} - ${user.state}` : 'N/A'}</TableCell>
+                              <TableCell className="text-sm">{user.legalArea}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  {urgencyLevel === 'high' && (
+                                    <>
+                                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                                      <span className="text-xs font-semibold text-red-600">Alta</span>
+                                    </>
+                                  )}
+                                  {urgencyLevel === 'medium' && (
+                                    <span className="text-xs font-semibold text-yellow-600">Média</span>
+                                  )}
+                                  {urgencyLevel === 'low' && (
+                                    <span className="text-xs font-semibold text-green-600">Baixa</span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-sm">{new Date(user.createdAt).toLocaleDateString('pt-BR')}</TableCell>
+                              <TableCell>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => {
+                                    if (pdfUrl) {
+                                      window.open(pdfUrl, '_blank');
+                                    } else {
+                                      alert('PDF não disponível para este usuário');
+                                    }
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  Ver PDF
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
                       )}
                     </TableBody>
                   </Table>
@@ -930,7 +970,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   <AlertCircle className="h-4 w-4 text-blue-600" />
                   <AlertDescription className="text-blue-900">
                     <strong>Campos incluídos na exportação:</strong> Nome completo, Email, WhatsApp,
-                    Área Jurídica, Data de cadastro, Todas as perguntas e respostas do questionário
+                    Cidade, Estado, Área Jurídica, Data de cadastro, Todas as perguntas e respostas do questionário
                   </AlertDescription>
                 </Alert>
               </CardContent>

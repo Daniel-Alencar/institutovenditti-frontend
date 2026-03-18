@@ -34,6 +34,7 @@ export interface DiagnosticRecord {
   totalScore: number;
   urgencyLevel: 'low' | 'medium' | 'high';
   aiReport: string;
+  pdfUrl?: string;
   createdAt: string;
 }
 
@@ -53,6 +54,8 @@ export interface UserRecord {
   email: string;
   whatsapp: string;
   legalArea: string;
+  city?: string;
+  state?: string;
   responses: QuestionnaireResponse[];
   createdAt: string;
 }
@@ -231,6 +234,8 @@ export const diagnosticsService = {
         email: diagnostic.userData.email,
         whatsapp: diagnostic.userData.whatsapp,
         legalArea: diagnostic.area.name,
+        city: diagnostic.userData.city,
+        state: diagnostic.userData.state,
         responses: diagnostic.responses,
       });
 
@@ -267,6 +272,23 @@ export const diagnosticsService = {
     } catch (error) {
       console.error('Error loading user diagnostics:', error);
       return [];
+    }
+  },
+
+  updatePdfUrl: async (diagnosticId: string, pdfUrl: string): Promise<DiagnosticRecord | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('diagnostics')
+        .update({ pdf_url: pdfUrl })
+        .eq('id', diagnosticId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return toCamelCase<DiagnosticRecord>(data);
+    } catch (error) {
+      console.error('Error updating PDF URL:', error);
+      return null;
     }
   },
 
@@ -524,11 +546,13 @@ export const lgpdService = {
 export const exportService = {
   exportUsersToCSV: async (): Promise<string> => {
     const users = await usersService.getAll();
-    const headers = ['Nome', 'Email', 'WhatsApp', 'Área Jurídica', 'Data Cadastro'];
+    const headers = ['Nome', 'Email', 'WhatsApp', 'Cidade', 'Estado', 'Área Jurídica', 'Data Cadastro'];
     const rows = users.map(u => [
       u.fullName,
       u.email,
       u.whatsapp,
+      u.city || '',
+      u.state || '',
       u.legalArea,
       new Date(u.createdAt).toLocaleDateString('pt-BR'),
     ]);
