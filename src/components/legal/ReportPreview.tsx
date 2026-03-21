@@ -75,8 +75,14 @@ export function ReportPreview({
 
         // Gera o PDF e faz upload para o Supabase Storage
         try {
+          console.log('[PDF] Iniciando geração do PDF...');
+
           const { generateLegalReportPDF } = await import('@/lib/pdf-generator');
           const { uploadPDFToBlob } = await import('@/lib/blob-storage');
+
+          // Busca anúncios diretamente (evita stale closure do useEffect paralelo)
+          const freshAnnouncements = await announcementsService.getActive();
+          console.log(`[PDF] ${freshAnnouncements.length} anúncio(s) carregado(s)`);
 
           const pdfBlob = await generateLegalReportPDF({
             area,
@@ -84,7 +90,9 @@ export function ReportPreview({
             aiReport: report,
             totalScore: score.totalPoints,
             urgencyLevel: score.urgencyLevel,
+            announcements: freshAnnouncements,
           });
+          console.log('[PDF] PDF gerado em memória. Tamanho:', pdfBlob.size, 'bytes');
 
           const safeName = userData.fullName
             .normalize('NFD')
@@ -94,15 +102,28 @@ export function ReportPreview({
           const dateStr = new Date().toISOString().split('T')[0];
           const filename = `diagnostico_${area.name.toLowerCase().replace(/\s+/g, '_')}_${safeName}_${dateStr}_${Date.now()}.pdf`;
 
+          console.log('[PDF] Fazendo upload para Supabase Storage. Arquivo:', filename);
           const pdfUrl = await uploadPDFToBlob(pdfBlob, filename);
+          console.log('[PDF] Upload concluído. URL:', pdfUrl);
 
-          // Atualiza o diagnóstico com a URL do PDF
+          // Salva a URL no banco de dados
           if (createdDiagnostic?.id) {
+            console.log('[PDF] Salvando pdf_url no banco. diagnosticId:', createdDiagnostic.id);
             await diagnosticsService.updatePdfUrl(createdDiagnostic.id, pdfUrl);
+            console.log('[PDF] ✅ pdf_url salvo com sucesso!');
+          } else {
+            console.warn('[PDF] ⚠️ createdDiagnostic sem ID — pdf_url não foi salvo no banco.', createdDiagnostic);
           }
-        } catch (pdfError) {
-          // Falha no PDF não impede o fluxo principal
-          console.error('Erro ao gerar/enviar PDF:', pdfError);
+        } catch (pdfError: any) {
+          console.error('[PDF] ❌ Falha no fluxo de PDF:', pdfError?.message ?? pdfError);
+          console.error('[PDF] Detalhes completos:', pdfError);
+          console.warn(
+            '[PDF] Checklist:\n' +
+            '  1. Bucket "pdfs" criado no Supabase Storage?\n' +
+            '  2. Política UPDATE em storage.objects para bucket "pdfs"?\n' +
+            '  3. Política UPDATE na tabela diagnostics?\n' +
+            '  → Execute supabase-storage-setup.sql no SQL Editor do Supabase'
+          );
         }
 
         if (userData.referralName && userData.referralWhatsapp) {
@@ -249,7 +270,8 @@ export function ReportPreview({
         userData,
         aiReport,
         totalScore: score.totalPoints,
-        urgencyLevel: score.urgencyLevel
+        urgencyLevel: score.urgencyLevel,
+        announcements: activeAnnouncements,
       });
 
       // Download PDF
@@ -282,7 +304,8 @@ export function ReportPreview({
         userData,
         aiReport,
         totalScore: score.totalPoints,
-        urgencyLevel: score.urgencyLevel
+        urgencyLevel: score.urgencyLevel,
+        announcements: activeAnnouncements,
       });
 
       // Prepare email

@@ -961,11 +961,35 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                                 <Button 
                                   size="sm" 
                                   variant="outline"
-                                  onClick={() => {
+                                  onClick={async () => {
+                                    // 1. Tenta usar o pdfUrl já carregado no estado (cache)
                                     if (pdfUrl) {
                                       window.open(pdfUrl, '_blank');
-                                    } else {
-                                      alert('PDF não disponível para este usuário');
+                                      return;
+                                    }
+                                    // 2. Cache pode estar desatualizado: busca diretamente no banco
+                                    try {
+                                      const freshDiagnostics = await diagnosticsService.getByUser(user.id);
+                                      const freshPdfUrl = freshDiagnostics
+                                        .sort((a: any, b: any) =>
+                                          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                                        )[0]?.pdfUrl ?? null;
+
+                                      if (freshPdfUrl) {
+                                        // Atualiza o cache local para cliques futuros
+                                        setAllDiagnostics(prev =>
+                                          prev.map(d =>
+                                            freshDiagnostics.find((fd: any) => fd.id === d.id)
+                                              ? { ...d, pdfUrl: freshPdfUrl }
+                                              : d
+                                          )
+                                        );
+                                        window.open(freshPdfUrl, '_blank');
+                                      } else {
+                                        alert('PDF ainda não disponível. O relatório pode estar sendo gerado ou houve um erro no upload.');
+                                      }
+                                    } catch {
+                                      alert('Erro ao buscar o PDF. Verifique sua conexão e tente novamente.');
                                     }
                                   }}
                                 >

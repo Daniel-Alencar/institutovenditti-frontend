@@ -1,6 +1,9 @@
 import { jsPDF } from 'jspdf';
 import type { LegalArea, QuestionnaireResponse, UserData } from '@/types/legal';
+import type { Announcement } from '@/lib/data-service';
 import { formatWhatsApp } from '@/lib/scoring';
+
+// ─── Tipos ───────────────────────────────────────────────────────────────────
 
 interface PDFGenerationOptions {
   area: LegalArea;
@@ -8,340 +11,442 @@ interface PDFGenerationOptions {
   aiReport: string;
   totalScore: number;
   urgencyLevel: 'high' | 'medium' | 'low';
+  /** Anúncios ativos buscados do banco. Se omitido, usa placeholders. */
+  announcements?: Announcement[];
 }
 
-/**
- * Generates a professional PDF report with Visual Law formatting
- * Includes advertisement banners and lawyer contact information
- */
-export async function generateLegalReportPDF(options: PDFGenerationOptions): Promise<Blob> {
-  const { area, userData, aiReport, totalScore, urgencyLevel } = options;
+interface Colors {
+  primary: string;
+  secondary: string;
+  accent: string;
+  text: string;
+  textLight: string;
+  bgLight: string;
+  warning: string;
+  success: string;
+  danger: string;
+}
 
-  // Create new PDF document - A4 size
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4'
+// Regex que detecta um marcador de espaço publicitário na linha
+const BANNER_MARKER_RE = /^\s*\[ESPAÇO_PUBLICITARIO_(\d)\]\s*$/i;
+
+// ─── Utilitários de imagem ────────────────────────────────────────────────────
+
+/**
+ * Carrega uma imagem a partir de uma URL e retorna base64, formato MIME
+ * e as dimensões naturais (px) da imagem.
+ * Retorna null se falhar (CORS, 404, etc.).
+ */
+async function fetchImageAsBase64(
+  url: string
+): Promise<{ data: string; format: 'PNG' | 'JPEG' | 'GIF' | 'WEBP'; naturalW: number; naturalH: number } | null> {
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const mime = blob.type || '';
+    const format = mime.includes('png')
+      ? 'PNG'
+      : mime.includes('gif')
+      ? 'GIF'
+      : mime.includes('webp')
+      ? 'WEBP'
+      : 'JPEG';
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        // Carrega em <img> para ler dimensões naturais
+        const img = new Image();
+        img.onload  = () => resolve({ data: base64, format, naturalW: img.naturalWidth, naturalH: img.naturalHeight });
+        img.onerror = () => resolve({ data: base64, format, naturalW: 0, naturalH: 0 });
+        img.src = base64;
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+// ─── Pré-carregamento de imagens ─────────────────────────────────────────────
+
+type ImgData = { data: string; format: 'PNG' | 'JPEG' | 'GIF' | 'WEBP'; naturalW: number; naturalH: number };
+type ImgCache = Record<number, ImgData | null>;
+
+async function preloadAnnouncementImages(announcements: Announcement[]): Promise<ImgCache> {
+  const cache: ImgCache = {};
+  await Promise.all(
+    announcements.map(async (ann) => {
+      if (ann.imageUrl) {
+        cache[ann.position] = await fetchImageAsBase64(ann.imageUrl);
+      } else {
+        cache[ann.position] = null;
+      }
+    })
+  );
+  return cache;
+}
+
+// ─── Renderização de banner ───────────────────────────────────────────────────
+
+/**
+ * Renderiza um espaço publicitário no PDF.
+ * Retorna o novo yPosition após o bloco.
+ */
+function renderBanner(
+  doc: jsPDF,
+  y: number,
+  position: number,
+  announcement: Announcement | undefined,
+  imgData: ImgData | null | undefined,
+  colors: Colors
+): number {
+  // ── Verificar se cabe na página ──────────────────────────────────────────
+  const totalH = announcement ? (imgData ? 50 : 20) : 20;
+  if (y + totalH > 275) {
+    doc.addPage();
+    y = 20;
+  }
+
+  const X = 15;
+  const W = 180;
+
+  if (!announcement) {
+    // ── Placeholder ──────────────────────────────────────────────────────
+    const placeholderColors = ['#DBEAFE', '#F3E8FF', '#D1FAE5', '#FED7AA'];
+    const borderColors      = ['#3B82F6', '#A855F7', '#10B981', '#F97316'];
+    const ci = (position - 1) % 4;
+
+    doc.setFillColor(placeholderColors[ci]);
+    doc.rect(X, y, W, 18, 'F');
+    doc.setDrawColor(borderColors[ci]);
+    doc.setLineWidth(0.4);
+    doc.rect(X, y, W, 18, 'S');
+
+    doc.setTextColor(colors.textLight);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.text(`Espaço Publicitário ${position} — sem anúncio configurado`, 105, y + 11, { align: 'center' });
+
+    return y + 20;
+  }
+
+  // ── Anúncio configurado ──────────────────────────────────────────────────
+
+  if (imgData) {
+    // Calcula altura proporcional às dimensões naturais da imagem
+    // Limita a 80mm para não ocupar a página toda; mínimo de 10mm
+    const ratio  = (imgData.naturalW > 0 && imgData.naturalH > 0)
+      ? imgData.naturalH / imgData.naturalW
+      : 42 / 180;                          // fallback: proporção padrão de banner
+    const imgH   = Math.min(Math.max(W * ratio, 10), 80);
+
+    // Garante que cabe na página antes de renderizar
+    if (y + imgH > 275) { doc.addPage(); y = 20; }
+
+    try {
+      doc.addImage(imgData.data, imgData.format, X, y, W, imgH);
+    } catch {
+      // Se falhar (formato não suportado, etc.) mostra cinza
+      doc.setFillColor('#E5E7EB');
+      doc.rect(X, y, W, imgH, 'F');
+      doc.setTextColor(colors.textLight);
+      doc.setFontSize(8);
+      doc.text(`[Imagem não pôde ser carregada — Anúncio ${position}]`, 105, y + imgH / 2, { align: 'center' });
+    }
+    y += imgH + 1;
+  }
+
+  // ── Seção de links ────────────────────────────────────────────────────────
+  const links: Array<{ label: string; url: string }> = [];
+  if (announcement.websiteUrl)   links.push({ label: 'Site',      url: announcement.websiteUrl });
+  if (announcement.facebookUrl)  links.push({ label: 'Facebook',  url: announcement.facebookUrl });
+  if (announcement.instagramUrl) links.push({ label: 'Instagram', url: announcement.instagramUrl });
+
+  if (links.length > 0) {
+    if (y + 12 > 275) { doc.addPage(); y = 20; }
+
+    // Fundo da barra de links
+    doc.setFillColor('#F1F5F9');
+    doc.rect(X, y, W, 11, 'F');
+    doc.setDrawColor('#CBD5E1');
+    doc.setLineWidth(0.3);
+    doc.rect(X, y, W, 11, 'S');
+
+    // Distribui os links horizontalmente
+    const segW = W / links.length;
+    links.forEach((link, i) => {
+      const cx = X + segW * i + segW / 2;
+      const cy = y + 7;
+
+      // Texto clicável
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor('#1D4ED8');
+      doc.textWithLink(link.label, cx, cy, { url: link.url, align: 'center' });
+
+      // Sublinha
+      const textW = doc.getTextWidth(link.label);
+      doc.setDrawColor('#1D4ED8');
+      doc.setLineWidth(0.2);
+      doc.line(cx - textW / 2, cy + 0.5, cx + textW / 2, cy + 0.5);
+    });
+
+    y += 13;
+  }
+
+  return y;
+}
+
+// ─── Renderização de linha de texto ──────────────────────────────────────────
+
+function renderTextLine(doc: jsPDF, line: string, y: number, colors: Colors): number {
+  if (y > 272) {
+    doc.addPage();
+    y = 20;
+  }
+
+  const clean = line.replace(/\*\*/g, '').replace(/\[.*?\]\(.*?\)/g, (m) => {
+    const label = m.match(/\[(.*?)\]/)?.[1] ?? '';
+    return label;
   });
 
-  // Visual Law color palette
-  const colors = {
-    primary: '#1E40AF',      // Blue institutional
-    secondary: '#059669',    // Green legal
-    accent: '#EA580C',       // Orange highlight
-    text: '#18181B',         // Zinc-900
-    textLight: '#52525B',    // Zinc-600
-    bgLight: '#F4F4F5',      // Zinc-100
-    warning: '#F59E0B',      // Amber
-    success: '#10B981',      // Green
-    danger: '#EF4444'        // Red
+  if (line.startsWith('# ')) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(colors.primary);
+    const text = doc.splitTextToSize(clean.replace(/^#\s+/, ''), 170);
+    doc.text(text, 20, y);
+    y += text.length * 7 + 2;
+  } else if (line.startsWith('## ')) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(colors.secondary);
+    const text = doc.splitTextToSize(clean.replace(/^##\s+/, ''), 170);
+    doc.text(text, 20, y);
+    y += text.length * 6 + 2;
+  } else if (line.startsWith('### ')) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(colors.text);
+    const text = doc.splitTextToSize(clean.replace(/^###\s+/, ''), 170);
+    doc.text(text, 20, y);
+    y += text.length * 5 + 1;
+  } else if (/^[-•*]\s/.test(line)) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(colors.text);
+    const text = doc.splitTextToSize(clean.replace(/^[-•*]\s/, ''), 163);
+    doc.text('•', 20, y);
+    doc.text(text, 25, y);
+    y += text.length * 5 + 1;
+  } else if (line.trim() === '' || line.trim() === '---') {
+    y += 3;
+  } else if (line.includes('[**FALAR COM ADVOGADO')) {
+    // ignora — CTA próprio é adicionado depois
+  } else {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(colors.text);
+    const text = doc.splitTextToSize(clean, 170);
+    doc.text(text, 20, y);
+    y += text.length * 5 + 1;
+  }
+
+  return y;
+}
+
+// ─── Função principal ────────────────────────────────────────────────────────
+
+export async function generateLegalReportPDF(options: PDFGenerationOptions): Promise<Blob> {
+  const { area, userData, aiReport, totalScore, urgencyLevel, announcements = [] } = options;
+
+  // 1. Pré-carrega imagens em paralelo antes de abrir o documento
+  const imgCache = await preloadAnnouncementImages(announcements);
+  const annByPos: Record<number, Announcement> = {};
+  announcements.forEach((a) => { annByPos[a.position] = a; });
+
+  // 2. Cria o documento PDF
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  const colors: Colors = {
+    primary:   '#1E40AF',
+    secondary: '#059669',
+    accent:    '#EA580C',
+    text:      '#18181B',
+    textLight: '#52525B',
+    bgLight:   '#F4F4F5',
+    warning:   '#F59E0B',
+    success:   '#10B981',
+    danger:    '#EF4444',
   };
 
-  let yPosition = 20;
+  let y = 20;
 
-  // HEADER - Logo and title
+  // ── Cabeçalho ──────────────────────────────────────────────────────────────
   doc.setFillColor(colors.primary);
   doc.rect(0, 0, 210, 40, 'F');
-
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(24);
+  doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.text('DIAGNÓSTICO JURÍDICO', 105, 20, { align: 'center' });
-
-  doc.setFontSize(12);
+  doc.text('DIAGNÓSTICO JURÍDICO', 105, 18, { align: 'center' });
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
   doc.text(area.name, 105, 30, { align: 'center' });
 
-  yPosition = 50;
+  y = 48;
 
-  // USER INFORMATION BOX
+  // ── Box de dados do cliente ────────────────────────────────────────────────
   doc.setFillColor(colors.bgLight);
-  doc.rect(15, yPosition, 180, 35, 'F');
+  doc.rect(15, y, 180, 35, 'F');
 
   doc.setTextColor(colors.text);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text('INFORMAÇÕES DO CLIENTE', 20, yPosition + 7);
+  doc.text('INFORMAÇÕES DO CLIENTE', 20, y + 7);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text(`Nome: ${userData.fullName}`, 20, yPosition + 14);
-  doc.text(`Email: ${userData.email}`, 20, yPosition + 20);
-  doc.text(`WhatsApp: ${formatWhatsApp(userData.whatsapp)}`, 20, yPosition + 26);
+  doc.text(`Nome: ${userData.fullName}`,              20,  y + 14);
+  doc.text(`Email: ${userData.email}`,                20,  y + 20);
+  doc.text(`WhatsApp: ${formatWhatsApp(userData.whatsapp)}`, 20, y + 26);
 
   if (userData.city && userData.state) {
-    doc.text(`Localização: ${userData.city} - ${userData.state}`, 120, yPosition + 14);
+    doc.text(`Localização: ${userData.city} - ${userData.state}`, 120, y + 14);
   }
 
-  const urgencyLabels = {
-    high: 'ALTA',
-    medium: 'MÉDIA',
-    low: 'BAIXA'
-  };
-
-  const urgencyColors = {
-    high: colors.danger,
-    medium: colors.warning,
-    low: colors.success
-  };
-
+  const urgencyLabels = { high: 'ALTA', medium: 'MÉDIA', low: 'BAIXA' };
+  const urgencyHex    = { high: colors.danger, medium: colors.warning, low: colors.success };
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(urgencyColors[urgencyLevel]);
-  doc.text(`Urgência: ${urgencyLabels[urgencyLevel]}`, 120, yPosition + 20);
-
+  doc.setTextColor(urgencyHex[urgencyLevel]);
+  doc.text(`Urgência: ${urgencyLabels[urgencyLevel]}`, 120, y + 20);
   doc.setTextColor(colors.text);
-  doc.text(`Pontuação: ${totalScore} pontos`, 120, yPosition + 26);
+  doc.text(`Pontuação: ${totalScore} pontos`, 120, y + 26);
 
-  yPosition += 40;
+  y += 40;
 
-  // ADVERTISEMENT BANNER 1 - After user info
-  yPosition = addAdvertisementBanner(doc, yPosition, 1, colors);
-  yPosition += 5;
+  // ── Corpo do relatório ─────────────────────────────────────────────────────
+  // Itera linha a linha; ao encontrar um marcador, insere o banner real
+  const lines = aiReport.split('\n');
+  let markersFound = 0;
 
-  // AI REPORT CONTENT
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(colors.primary);
-  doc.text('RELATÓRIO DIAGNÓSTICO', 20, yPosition);
-  yPosition += 8;
+  for (const line of lines) {
+    const match = line.match(BANNER_MARKER_RE);
 
-  // Process and add report content
-  const reportLines = aiReport.split('\n');
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(colors.text);
-
-  for (const line of reportLines) {
-    // Check if we need a new page
-    if (yPosition > 270) {
-      doc.addPage();
-      yPosition = 20;
-    }
-
-    if (line.startsWith('# ')) {
-      // Main heading
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
-      doc.setTextColor(colors.primary);
-      const text = line.replace('# ', '');
-      doc.text(text, 20, yPosition);
-      yPosition += 8;
-    } else if (line.startsWith('## ')) {
-      // Section heading
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(colors.secondary);
-      const text = line.replace('## ', '');
-      doc.text(text, 20, yPosition);
-      yPosition += 6;
-    } else if (line.startsWith('### ')) {
-      // Subsection heading
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(colors.text);
-      const text = line.replace('### ', '');
-      doc.text(text, 20, yPosition);
-      yPosition += 5;
-    } else if (line.startsWith('- ') || line.startsWith('* ')) {
-      // Bullet point
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(colors.text);
-      const text = line.replace(/^[*-]\s/, '');
-      const splitText = doc.splitTextToSize(text, 170);
-      doc.text('•', 20, yPosition);
-      doc.text(splitText, 25, yPosition);
-      yPosition += splitText.length * 5;
-    } else if (line.includes('**') && line.length > 0) {
-      // Bold text (simplified - just treat as regular for now)
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(colors.text);
-      const cleanText = line.replace(/\*\*/g, '');
-      const splitText = doc.splitTextToSize(cleanText, 170);
-      doc.text(splitText, 20, yPosition);
-      yPosition += splitText.length * 5;
-    } else if (line.trim() === '') {
-      // Empty line
-      yPosition += 3;
-    } else if (line.includes('[**FALAR COM ADVOGADO')) {
-      // Special lawyer contact section - skip (we'll add custom)
-      continue;
+    if (match) {
+      // Linha é um marcador de espaço publicitário
+      const pos = parseInt(match[1], 10);
+      markersFound++;
+      y += 3; // espaço acima do banner
+      y = renderBanner(doc, y, pos, annByPos[pos], imgCache[pos], colors);
+      y += 3; // espaço abaixo do banner
     } else {
-      // Regular paragraph
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(colors.text);
-      const splitText = doc.splitTextToSize(line, 170);
-      doc.text(splitText, 20, yPosition);
-      yPosition += splitText.length * 5;
+      // Linha de texto normal
+      if (y > 272) {
+        doc.addPage();
+        y = 20;
+      }
+      y = renderTextLine(doc, line, y, colors);
     }
   }
 
-  // ADVERTISEMENT BANNER 2 - Mid report
-  if (yPosition > 270) {
-    doc.addPage();
-    yPosition = 20;
+  // ── Fallback: se o texto não tinha nenhum marcador, adiciona os 4 banners
+  //    no final do relatório (compatibilidade com respostas de backend externo)
+  if (markersFound === 0) {
+    for (let pos = 1; pos <= 4; pos++) {
+      y += 5;
+      y = renderBanner(doc, y, pos, annByPos[pos], imgCache[pos], colors);
+    }
   }
-  yPosition = addAdvertisementBanner(doc, yPosition, 2, colors);
-  yPosition += 10;
 
-  // LAWYER CONTACT SECTION
-  if (yPosition > 250) {
-    doc.addPage();
-    yPosition = 20;
-  }
+  // ── Seção: Fale com um advogado ────────────────────────────────────────────
+  y += 5;
+  if (y + 32 > 275) { doc.addPage(); y = 20; }
 
   doc.setFillColor(colors.secondary);
-  doc.rect(15, yPosition, 180, 30, 'F');
-
+  doc.rect(15, y, 180, 30, 'F');
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(12);
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text('CONSULTE UM ADVOGADO ESPECIALIZADO', 105, yPosition + 10, { align: 'center' });
-
-  doc.setFontSize(10);
+  doc.text('CONSULTE UM ADVOGADO ESPECIALIZADO', 105, y + 11, { align: 'center' });
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text('WhatsApp: (11) 92148-6194', 105, yPosition + 18, { align: 'center' });
-  doc.text('wa.me/5511921486194', 105, yPosition + 24, { align: 'center' });
+  doc.text('WhatsApp: (11) 92148-6194', 105, y + 19, { align: 'center' });
+  doc.textWithLink('wa.me/5511921486194', 105, y + 25, { url: 'https://wa.me/5511921486194', align: 'center' });
 
-  yPosition += 35;
+  y += 35;
 
-  // ADVERTISEMENT BANNER 3
-  yPosition = addAdvertisementBanner(doc, yPosition, 3, colors);
-  yPosition += 10;
+  // ── Prazos legais ─────────────────────────────────────────────────────────
+  if (y + 38 > 275) { doc.addPage(); y = 20; }
 
-  // LEGAL DEADLINES WARNING (Item 2 - Prazos Legais)
-  if (yPosition > 240) {
-    doc.addPage();
-    yPosition = 20;
-  }
-
-  doc.setFillColor(255, 237, 213); // Orange light
-  const deadlinesHeight = 35; // Increased height for proper text fit
-  doc.rect(15, yPosition, 180, deadlinesHeight, 'F');
-
+  doc.setFillColor(255, 237, 213);
+  doc.rect(15, y, 180, 35, 'F');
   doc.setTextColor(colors.accent);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  doc.text('⚠️ PRAZOS LEGAIS - ATENÇÃO', 20, yPosition + 7);
-
+  doc.text('⚠ PRAZOS LEGAIS — ATENÇÃO', 20, y + 7);
   doc.setTextColor(colors.text);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  const deadlinesText = 'IMPORTANTE: Muitas ações judiciais possuem prazos de prescrição que variam de acordo com o tipo de direito. Após esse prazo, você pode perder o direito de buscar reparação na justiça. Não deixe para depois! Consulte um advogado para verificar os prazos aplicáveis ao seu caso.';
-  const deadlinesLines = doc.splitTextToSize(deadlinesText, 170);
-  doc.text(deadlinesLines, 20, yPosition + 14);
+  const deadlinesText =
+    'IMPORTANTE: Muitas ações judiciais possuem prazos de prescrição que variam de acordo com o ' +
+    'tipo de direito. Após esse prazo, você pode perder o direito de buscar reparação na justiça. ' +
+    'Não deixe para depois! Consulte um advogado para verificar os prazos aplicáveis ao seu caso.';
+  doc.text(doc.splitTextToSize(deadlinesText, 170), 20, y + 14);
 
-  yPosition += deadlinesHeight + 5;
+  y += 38;
 
-  // DISCLAIMER (Aviso Legal)
-  if (yPosition > 240) {
-    doc.addPage();
-    yPosition = 20;
-  }
+  // ── Aviso legal ───────────────────────────────────────────────────────────
+  if (y + 42 > 275) { doc.addPage(); y = 20; }
 
-  const disclaimerHeight = 40; // Increased height for proper text fit
-  doc.setFillColor(255, 245, 235); // Amber light
-  doc.rect(15, yPosition, 180, disclaimerHeight, 'F');
-
+  doc.setFillColor(255, 245, 235);
+  doc.rect(15, y, 180, 38, 'F');
   doc.setTextColor(colors.warning);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  doc.text('⚠ AVISO LEGAL IMPORTANTE', 20, yPosition + 7);
-
+  doc.text('⚠ AVISO LEGAL IMPORTANTE', 20, y + 7);
   doc.setTextColor(colors.text);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  const disclaimerText = 'Este diagnóstico é uma análise preliminar gerada por inteligência artificial e pode conter imprecisões ou estar desatualizado. Não substitui consulta com advogado e não constitui aconselhamento jurídico formal. Para avaliação jurídica completa, precisa e adequada à sua situação específica, consulte sempre um advogado devidamente habilitado pela OAB.';
-  const disclaimerLines = doc.splitTextToSize(disclaimerText, 170);
-  doc.text(disclaimerLines, 20, yPosition + 14);
+  const disclaimerText =
+    'Este diagnóstico é uma análise preliminar gerada por inteligência artificial e pode conter ' +
+    'imprecisões ou estar desatualizado. Não substitui consulta com advogado e não constitui ' +
+    'aconselhamento jurídico formal. Para avaliação jurídica completa, precisa e adequada à sua ' +
+    'situação específica, consulte sempre um advogado devidamente habilitado pela OAB.';
+  doc.text(doc.splitTextToSize(disclaimerText, 170), 20, y + 14);
 
-  yPosition += disclaimerHeight;
+  y += 42;
 
-  // ADVERTISEMENT BANNER 4 - Final
-  yPosition = addAdvertisementBanner(doc, yPosition, 4, colors);
+  // ── Rodapé em todas as páginas ────────────────────────────────────────────
+  const pageCount = (doc.internal as any).pages.length - 1;
+  const dateStr   = new Date().toLocaleDateString('pt-BR');
+  const timeStr   = new Date().toLocaleTimeString('pt-BR');
 
-  // FOOTER - Generation date
-  const pageCount = doc.internal.pages.length - 1;
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setFontSize(7);
     doc.setTextColor(colors.textLight);
     doc.setFont('helvetica', 'italic');
-    const date = new Date().toLocaleDateString('pt-BR');
-    const time = new Date().toLocaleTimeString('pt-BR');
-    doc.text(`Gerado em ${date} às ${time} | Página ${i} de ${pageCount}`, 105, 290, { align: 'center' });
+    doc.text(
+      `Gerado em ${dateStr} às ${timeStr} | Página ${i} de ${pageCount}`,
+      105,
+      290,
+      { align: 'center' }
+    );
   }
 
-  // Return PDF as blob
   return doc.output('blob');
 }
 
-/**
- * Adds an advertisement banner placeholder to the PDF
- */
-function addAdvertisementBanner(
-  doc: jsPDF,
-  yPosition: number,
-  position: number,
-  colors: Record<string, string>
-): number {
-  const bannerColors = [
-    '#DBEAFE', // Blue
-    '#F3E8FF', // Purple
-    '#D1FAE5', // Green
-    '#FED7AA'  // Orange
-  ];
+// ─── Download helper ──────────────────────────────────────────────────────────
 
-  const bannerBorderColors = [
-    '#3B82F6',
-    '#A855F7',
-    '#10B981',
-    '#F97316'
-  ];
-
-  const colorIndex = (position - 1) % 4;
-
-  // Check if we need a new page (banner is 50mm tall now)
-  if (yPosition > 230) {
-    doc.addPage();
-    yPosition = 20;
-  }
-
-  // Draw banner background
-  doc.setFillColor(bannerColors[colorIndex]);
-  doc.rect(15, yPosition, 180, 50, 'F');
-
-  // Draw banner border
-  doc.setDrawColor(bannerBorderColors[colorIndex]);
-  doc.setLineWidth(0.5);
-  doc.rect(15, yPosition, 180, 50, 'S');
-
-  // Add banner text
-  doc.setTextColor(colors.textLight);
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'italic');
-  doc.text(`Espaço Publicitário ${position}`, 20, yPosition + 8);
-
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(colors.text);
-  doc.text('Banner 180mm x 50mm', 105, yPosition + 20, { align: 'center' });
-
-  doc.setFontSize(9);
-  doc.text('Anúncio Disponível', 105, yPosition + 28, { align: 'center' });
-
-  return yPosition + 50;
-}
-
-/**
- * Downloads a PDF blob with a given filename
- */
 export function downloadPDF(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
+  const url  = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = url;
+  link.href     = url;
   link.download = filename;
   document.body.appendChild(link);
   link.click();

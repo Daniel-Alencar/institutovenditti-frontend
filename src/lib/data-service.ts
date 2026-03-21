@@ -275,67 +275,20 @@ export const diagnosticsService = {
     }
   },
 
-  // Retorna o diagnóstico mais recente de um usuário (inclui urgency_level e pdf_url)
-  getLatestByUser: async (userId: string): Promise<DiagnosticRecord | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('diagnostics')
-        .select('id, user_id, urgency_level, pdf_url, total_score, created_at, area')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+  updatePdfUrl: async (diagnosticId: string, pdfUrl: string): Promise<DiagnosticRecord> => {
+    const { data, error } = await supabase
+      .from('diagnostics')
+      .update({ pdf_url: pdfUrl })
+      .eq('id', diagnosticId)
+      .select()
+      .single();
 
-      if (error) throw error;
-      if (!data) return null;
-      return toCamelCase<DiagnosticRecord>(data);
-    } catch (error) {
-      console.error('Error loading latest user diagnostic:', error);
-      return null;
+    if (error) {
+      // Sem try/catch aqui: o erro precisa chegar ao chamador para ser visível
+      console.error('[updatePdfUrl] Supabase error:', error);
+      throw new Error(`Falha ao salvar pdf_url no banco: ${error.message} (code: ${error.code})`);
     }
-  },
-
-  // Retorna todos os diagnósticos mais recentes indexados por user_id
-  getLatestPerUser: async (): Promise<Record<string, DiagnosticRecord>> => {
-    try {
-      // Busca todos os diagnósticos ordenados por data (mais recente primeiro)
-      const { data, error } = await supabase
-        .from('diagnostics')
-        .select('id, user_id, urgency_level, pdf_url, total_score, created_at, area')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Mantém apenas o mais recente por usuário
-      const latestPerUser: Record<string, DiagnosticRecord> = {};
-      for (const row of (data || [])) {
-        const record = toCamelCase<DiagnosticRecord>(row);
-        if (!latestPerUser[record.userId]) {
-          latestPerUser[record.userId] = record;
-        }
-      }
-      return latestPerUser;
-    } catch (error) {
-      console.error('Error loading latest diagnostics per user:', error);
-      return {};
-    }
-  },
-
-  updatePdfUrl: async (diagnosticId: string, pdfUrl: string): Promise<DiagnosticRecord | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('diagnostics')
-        .update({ pdf_url: pdfUrl })
-        .eq('id', diagnosticId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return toCamelCase<DiagnosticRecord>(data);
-    } catch (error) {
-      console.error('Error updating PDF URL:', error);
-      return null;
-    }
+    return toCamelCase<DiagnosticRecord>(data);
   },
 
   getStats: async () => {
