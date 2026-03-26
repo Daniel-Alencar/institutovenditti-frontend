@@ -58,8 +58,8 @@ export function LandingPage({ onStart }: LandingPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[oklch(0.20_0.12_245)] via-[oklch(0.23_0.10_248)] to-[oklch(0.25_0.08_250)] py-12">
-      <div className="container mx-auto px-4 max-w-6xl">
+    <div className="min-h-screen bg-gradient-to-br from-[oklch(0.20_0.12_245)] via-[oklch(0.23_0.10_248)] to-[oklch(0.25_0.08_250)] py-12 flex flex-col">
+      <div className="container mx-auto px-4 max-w-6xl flex-grow">
         {/* Hero Section */}
         <div className="text-center mb-12">
           <div className="flex justify-center mb-6">
@@ -248,7 +248,7 @@ export function LandingPage({ onStart }: LandingPageProps) {
         </Card>
 
         {/* Disclaimer - Maximum Visibility */}
-        <Alert className="border-3 border-[oklch(0.75_0.12_85)] bg-white shadow-2xl">
+        <Alert className="border-3 border-[oklch(0.75_0.12_85)] bg-white shadow-2xl mb-8">
           <Info className="h-7 w-7 text-[oklch(0.75_0.12_85)] flex-shrink-0 mt-1" />
           <AlertDescription className="text-[oklch(0.20_0.12_245)] text-base leading-relaxed">
             <strong className="text-[oklch(0.20_0.12_245)] font-extrabold text-lg block mb-1">
@@ -262,6 +262,12 @@ export function LandingPage({ onStart }: LandingPageProps) {
           </AlertDescription>
         </Alert>
       </div>
+
+      {/* Footer */}
+      <footer className="text-center py-6 text-white/80 text-sm mt-auto">
+        <p>Copyright 2026 by INSTITUTO VENDITTI - Educação - Moda - Empreendedorismo.</p>
+        <p>CNPJ: 62.170.498/0001-98</p>
+      </footer>
     </div>
   );
 }
