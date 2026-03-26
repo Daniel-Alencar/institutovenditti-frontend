@@ -371,7 +371,7 @@ export async function generateLegalReportPDF(options: PDFGenerationOptions): Pro
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text('CONSULTE UM ADVOGADO ESPECIALIZADO', 105, y + 11, { align: 'center' });
+  doc.text('Se quiser a indicação de um advogado, clique aqui para falar com um especialista', 105, y + 11, { align: 'center' });
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text('WhatsApp: (11) 92148-6194', 105, y + 19, { align: 'center' });

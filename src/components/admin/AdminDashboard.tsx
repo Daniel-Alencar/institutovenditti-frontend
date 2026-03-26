@@ -697,31 +697,43 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             <Card>
               <CardHeader>
                 <CardTitle>Gerenciar Anúncios</CardTitle>
-                <CardDescription>Configure os 4 espaços publicitários do relatório</CardDescription>
+                <CardDescription>Configure os 6 espaços publicitários — 4 no relatório PDF e 2 na tela de carregamento</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Legend */}
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                    <p className="font-semibold text-blue-800 mb-1">📄 Posições 1 – 4</p>
+                    <p className="text-blue-700">Aparecem no relatório em PDF, intercalados com o conteúdo da análise jurídica.</p>
+                  </div>
+                  <div className="rounded-lg border border-violet-200 bg-violet-50 p-3">
+                    <p className="font-semibold text-violet-800 mb-1">⏳ Posições 5 – 6</p>
+                    <p className="text-violet-700">Aparecem lado a lado na tela de carregamento, enquanto a IA gera o diagnóstico.</p>
+                  </div>
+                </div>
+
                 <Button
                   onClick={() => {
-                    const newPos = (announcements.length + 1) as 1 | 2 | 3 | 4;
-                    if (newPos <= 4) {
-                      setEditingAnnouncement({
-                        id: '__NEW__',
-                        imageUrl: '',
-                        validFrom: new Date().toISOString().split('T')[0],
-                        validTo: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
-                        websiteUrl: '',
-                        facebookUrl: '',
-                        instagramUrl: '',
-                        position: newPos,
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString(),
-                      });
-                    }
+                    const usedPositions = announcements.map((a: any) => a.position);
+                    const nextPos = ([1,2,3,4,5,6] as const).find(p => !usedPositions.includes(p));
+                    if (!nextPos) return;
+                    setEditingAnnouncement({
+                      id: '__NEW__',
+                      imageUrl: '',
+                      validFrom: new Date().toISOString().split('T')[0],
+                      validTo: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
+                      websiteUrl: '',
+                      facebookUrl: '',
+                      instagramUrl: '',
+                      position: nextPos,
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                    });
                   }}
-                  disabled={announcements.length >= 4}
+                  disabled={announcements.length >= 6}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Novo Anúncio {announcements.length < 4 ? `(${announcements.length}/4)` : '(Limite atingido)'}
+                  Novo Anúncio {announcements.length < 6 ? `(${announcements.length}/6)` : '(Limite atingido)'}
                 </Button>
 
                 {editingAnnouncement && (
@@ -814,12 +826,16 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                   </Card>
                 )}
 
-                <div className="grid md:grid-cols-2 gap-4">
-                  {announcements.map((ann) => (
-                    <Card key={ann.id}>
-                      <CardHeader>
-                        <CardTitle className="text-base flex items-center justify-between">
-                          <span>Espaço Publicitário {ann.position}</span>
+                {/* PDF ads 1-4 */}
+                {announcements.filter((a: any) => a.position <= 4).length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-700 mb-2">📄 Anúncios do Relatório PDF (posições 1–4)</p>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {announcements.filter((a: any) => a.position <= 4).map((ann) => (
+                        <Card key={ann.id}>
+                          <CardHeader>
+                            <CardTitle className="text-base flex items-center justify-between">
+                              <span>Espaço Publicitário {ann.position}</span>
                           <div className="flex gap-2">
                             <Button size="sm" variant="outline" onClick={() => setEditingAnnouncement(ann)}>
                               <Edit className="h-3 w-3" />
@@ -858,7 +874,62 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                       </CardContent>
                     </Card>
                   ))}
-                </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Loading screen ads 5-6 */}
+                {announcements.filter((a: any) => a.position >= 5).length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-700 mb-2">⏳ Anúncios da Tela de Carregamento (posições 5–6)</p>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {announcements.filter((a: any) => a.position >= 5).map((ann) => (
+                        <Card key={ann.id} className="border-violet-200">
+                          <CardHeader>
+                            <CardTitle className="text-base flex items-center justify-between">
+                              <span>Espaço Publicitário {ann.position}</span>
+                              <div className="flex gap-2">
+                                <Button size="sm" variant="outline" onClick={() => setEditingAnnouncement(ann)}>
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={async () => {
+                                    if (confirm('Deseja excluir este anúncio?')) {
+                                      await announcementsService.delete(ann.id);
+                                      const announcementsData = await announcementsService.getAll();
+                                      setAnnouncements(announcementsData);
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-zinc-500" />
+                              <span className="text-xs text-zinc-600">
+                                {new Date(ann.validFrom).toLocaleDateString()} até {new Date(ann.validTo).toLocaleDateString()}
+                              </span>
+                            </div>
+                            {ann.imageUrl && (
+                              <img src={ann.imageUrl} alt={`Banner ${ann.position}`} className="w-full h-24 object-cover rounded" />
+                            )}
+                            <div className="flex gap-2">
+                              {ann.websiteUrl && <LinkIcon className="h-4 w-4 text-blue-600" />}
+                              {ann.facebookUrl && <span className="text-xs text-blue-600">FB</span>}
+                              {ann.instagramUrl && <span className="text-xs text-pink-600">IG</span>}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
               </CardContent>
             </Card>
           </TabsContent>

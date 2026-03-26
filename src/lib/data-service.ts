@@ -20,7 +20,7 @@ export interface Announcement {
   websiteUrl: string;
   facebookUrl: string;
   instagramUrl: string;
-  position: 1 | 2 | 3 | 4;
+  position: 1 | 2 | 3 | 4 | 5 | 6;
   createdAt: string;
   updatedAt: string;
 }

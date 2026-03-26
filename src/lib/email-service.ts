@@ -161,7 +161,7 @@ export function prepareEmailTemplate(options: {
 
                   <div style="background-color: #059669; border-radius: 6px; padding: 20px; text-align: center; margin: 0 0 20px 0;">
                     <p style="color: #ffffff; margin: 0 0 10px 0; font-size: 16px; font-weight: bold;">
-                      Consulte um Advogado Especializado
+                      Se quiser a indicação de um advogado, clique aqui para falar com um especialista
                     </p>
                     <p style="color: #ffffff; margin: 0 0 5px 0; font-size: 14px;">
                       WhatsApp: (11) 92148-6194

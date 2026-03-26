@@ -725,3 +725,17 @@ CREATE TRIGGER trigger_update_user_urgency
 -- SELECT id, name, public FROM storage.buckets WHERE id IN ('pdfs', 'banners');
 -- SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'diagnostics' ORDER BY ordinal_position;
 -- SELECT * FROM users_with_diagnostics LIMIT 5;
+
+
+-- ============================================================================
+-- Expandir posições de anúncios de 1-4 para 1-6
+-- Execute no SQL Editor do Supabase
+-- ============================================================================
+
+-- Remove o constraint antigo e cria um novo com range 1-6
+ALTER TABLE announcements DROP CONSTRAINT IF EXISTS announcements_position_check;
+ALTER TABLE announcements ADD CONSTRAINT announcements_position_check
+  CHECK (position BETWEEN 1 AND 6);
+
+-- Verificação
+-- SELECT conname, consrc FROM pg_constraint WHERE conrelid = 'announcements'::regclass;

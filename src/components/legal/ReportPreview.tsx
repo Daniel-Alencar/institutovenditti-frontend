@@ -462,6 +462,74 @@ export function ReportPreview({
             <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-zinc-600" />
             <p className="text-lg text-zinc-600">Gerando seu relatório com inteligência artificial...</p>
             <p className="text-sm text-zinc-500 mt-2">Isso pode levar alguns segundos</p>
+
+            {/* Anúncios da tela de carregamento — posições 5 e 6 */}
+            {(() => {
+              const ad5 = activeAnnouncements.find(a => a.position === 5);
+              const ad6 = activeAnnouncements.find(a => a.position === 6);
+              if (!ad5 && !ad6) return null;
+              return (
+                <div className="mt-8 grid grid-cols-2 gap-4 text-left">
+                  {[ad5, ad6].map((ann, i) => {
+                    if (!ann) return <div key={i} />;
+                    return (
+                      <div
+                        key={ann.id}
+                        className="rounded-lg border border-zinc-200 bg-white shadow-sm overflow-hidden"
+                      >
+                        <p className="text-[10px] text-zinc-400 text-center py-1 border-b border-zinc-100 uppercase tracking-wide">
+                          Publicidade
+                        </p>
+                        {ann.imageUrl && (
+                          <img
+                            src={ann.imageUrl}
+                            alt={`Anúncio ${ann.position}`}
+                            className="w-full h-auto object-contain"
+                          />
+                        )}
+                        {(ann.websiteUrl || ann.facebookUrl || ann.instagramUrl) && (
+                          <div className="flex flex-wrap gap-1.5 justify-center p-2 border-t border-zinc-100">
+                            {ann.websiteUrl && (
+                              <a
+                                href={ann.websiteUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-zinc-100 hover:bg-zinc-200 rounded text-[10px] font-medium text-zinc-700 transition-colors"
+                              >
+                                <ExternalLink className="h-2.5 w-2.5" />
+                                Site
+                              </a>
+                            )}
+                            {ann.facebookUrl && (
+                              <a
+                                href={ann.facebookUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-[10px] font-medium text-white transition-colors"
+                              >
+                                <ExternalLink className="h-2.5 w-2.5" />
+                                Facebook
+                              </a>
+                            )}
+                            {ann.instagramUrl && (
+                              <a
+                                href={ann.instagramUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded text-[10px] font-medium text-white transition-colors"
+                              >
+                                <ExternalLink className="h-2.5 w-2.5" />
+                                Instagram
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       ) : (

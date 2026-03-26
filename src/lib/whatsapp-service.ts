@@ -216,9 +216,6 @@ export function prepareReferralMessage(options: {
   message += `✅ *Relatório em PDF*\n\n`;
   message += `📲 *Acesse agora e conheça seus direitos:*\n`;
   message += `${siteUrl}\n\n`;
-  message += `💬 *Dúvidas? Fale com um advogado:*\n`;
-  message += `https://wa.me/5511921486194\n\n`;
-  message += `_Mensagem enviada pelo Instituto Venditti_`;
 
   return message;
 }
