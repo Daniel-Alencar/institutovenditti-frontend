@@ -282,12 +282,14 @@ export function AnalyticsDashboard() {
         <KpiCard
           title="Acessos Totais" value={fmt(data?.total ?? 0)}
           // sub={`Este mês: ${fmt(data?.thisMonth ?? 0)}`}
+          sub={""}
           icon={<TrendingUp className="h-5 w-5 text-white" />}
           color="blue" trend={monthTrend}
         />
         <KpiCard
           title="Questionários" value={fmt(data?.totalQuestionnaires ?? 0)}
           // sub={`Este mês: ${fmt(data?.thisMonthQuestionnaires ?? 0)}`}
+          sub={""}
           icon={<FileText className="h-5 w-5 text-white" />}
           color="green"
         />
