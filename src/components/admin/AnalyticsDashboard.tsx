@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { analyticsService } from '@/lib/data-service';
 
+import seedrandom from 'seedrandom';
+
 // ─── Fake data generator ──────────────────────────────────────────────────────
 
 function generateFakeData() {
@@ -21,14 +23,17 @@ function generateFakeData() {
   const months = [];
   const areas = ['Trabalhista', 'Consumidor', 'Previdenciário', 'Civil', 'Criminal', 'Família'];
   const dailyHistory: Array<{ date: string; count: number; questionnaires: number }> = [];
+  
+  // Inicializa com uma semente fixa (ex: 'semente123')
+  const rng = seedrandom('semente123');
 
   // Generate 12 months of data
   for (let m = 11; m >= 0; m--) {
     const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
     const monthLabel = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-    const base = 1800 + Math.sin(m * 0.5) * 600 + Math.random() * 400;
+    const base = 1800 + Math.sin(m * 0.5) * 600 + rng() * 400;
     const accesses = Math.round(base);
-    const questionnaires = Math.round(accesses * (0.28 + Math.random() * 0.12));
+    const questionnaires = Math.round(accesses * (0.28 + rng() * 0.12));
     months.push({ month: monthLabel, acessos: accesses, questionarios: questionnaires, date: d });
 
     // Daily breakdown for this month
@@ -40,8 +45,8 @@ function generateFakeData() {
       const dayBase = (accesses / daysInMonth) * (isWeekend ? 0.55 : 1.2);
       dailyHistory.push({
         date: date.toISOString().split('T')[0],
-        count: Math.round(dayBase * (0.7 + Math.random() * 0.6)),
-        questionnaires: Math.round(dayBase * 0.3 * (0.7 + Math.random() * 0.6)),
+        count: Math.round(dayBase * (0.7 + rng() * 0.6)),
+        questionnaires: Math.round(dayBase * 0.3 * (0.7 + rng() * 0.6)),
       });
     }
   }
@@ -276,13 +281,13 @@ export function AnalyticsDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           title="Acessos Totais" value={fmt(data?.total ?? 0)}
-          sub={`Este mês: ${fmt(data?.thisMonth ?? 0)}`}
+          // sub={`Este mês: ${fmt(data?.thisMonth ?? 0)}`}
           icon={<TrendingUp className="h-5 w-5 text-white" />}
           color="blue" trend={monthTrend}
         />
         <KpiCard
           title="Questionários" value={fmt(data?.totalQuestionnaires ?? 0)}
-          sub={`Este mês: ${fmt(data?.thisMonthQuestionnaires ?? 0)}`}
+          // sub={`Este mês: ${fmt(data?.thisMonthQuestionnaires ?? 0)}`}
           icon={<FileText className="h-5 w-5 text-white" />}
           color="green"
         />
