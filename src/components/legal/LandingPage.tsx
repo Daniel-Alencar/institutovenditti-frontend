@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 
 interface LandingPageProps {
   onStart: () => void;
+  onStartFoodService: () => void;
 }
 
 interface Stats {
@@ -19,7 +20,7 @@ interface Stats {
   totalUsers: number;
 }
 
-export function LandingPage({ onStart }: LandingPageProps) {
+export function LandingPage({ onStart, onStartFoodService }: LandingPageProps) {
   const [stats, setStats] = useState<Stats>({
     totalAccesses: 0,
     totalQuestionnaires: 0,
@@ -112,7 +113,7 @@ export function LandingPage({ onStart }: LandingPageProps) {
             </button>
 
             <button
-              onClick={() => { }}
+              onClick={() => { onStartFoodService(); }}
               className="flex items-center gap-4 bg-white/10 backdrop-blur-md border-2 border-white/25 rounded-2xl px-8 py-5 text-left hover:bg-white/20 hover:border-[oklch(0.75_0.12_85)]/60 hover:shadow-[0_10px_40px_rgba(255,215,0,0.15)] transition-all group cursor-pointer max-w-md opacity-90"
             >
               <div className="bg-[oklch(0.75_0.12_85)]/20 p-3 rounded-xl group-hover:bg-[oklch(0.75_0.12_85)]/30 transition-colors flex-shrink-0">

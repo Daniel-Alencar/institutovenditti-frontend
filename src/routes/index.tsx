@@ -11,6 +11,7 @@ import { AdminLogin } from "@/components/admin/AdminLogin";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { type LegalArea, type QuestionnaireResponse, type UserData } from "@/types/legal";
 import { analyticsService } from "@/lib/data-service";
+import { foodServiceArea } from "@/data/food-service-area";
 
 export const Route = createFileRoute("/")({
 	component: App,
@@ -82,6 +83,23 @@ function App() {
 		}
 	};
 
+	// Track if food service flow was requested (to resume after terms acceptance)
+	const [pendingFoodService, setPendingFoodService] = useState(false);
+
+	const handleStartFoodService = () => {
+		if (termsAccepted && lgpdAccepted) {
+			setSelectedArea(foodServiceArea);
+			setCurrentStep('questionnaire');
+		} else {
+			setPendingFoodService(true);
+			if (!termsAccepted) {
+				setShowTermsModal(true);
+			} else if (!lgpdAccepted) {
+				setShowLGPDModal(true);
+			}
+		}
+	};
+
 	const handleTermsAccept = () => {
 		setTermsAccepted(true);
 		setShowTermsModal(false);
@@ -97,8 +115,15 @@ function App() {
 	const handleLGPDAccept = () => {
 		setLgpdAccepted(true);
 		setShowLGPDModal(false);
-		// Only proceed to area selection after both acceptances
-		setCurrentStep('area-selection');
+		// If food service flow was pending, go directly to its questionnaire
+		if (pendingFoodService) {
+			setPendingFoodService(false);
+			setSelectedArea(foodServiceArea);
+			setCurrentStep('questionnaire');
+		} else {
+			// Only proceed to area selection after both acceptances
+			setCurrentStep('area-selection');
+		}
 	};
 
 	const handleLGPDDecline = () => {
@@ -151,7 +176,7 @@ function App() {
 			/>
 
 			{currentStep === 'landing' && (
-				<LandingPage onStart={handleStartDiagnostic} />
+				<LandingPage onStart={handleStartDiagnostic} onStartFoodService={handleStartFoodService} />
 			)}
 
 			{currentStep === 'area-selection' && (

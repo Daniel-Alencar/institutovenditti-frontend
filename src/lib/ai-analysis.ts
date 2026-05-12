@@ -82,6 +82,62 @@ const ANALYSIS_SYSTEM_PROMPT = `
 `;
 
 /**
+ * Specialized system prompt for Food Service AI analysis
+ * Based on "PROMPT DE AUDITORIA MASTER: MÉTODO DELIVERY SEGURO"
+ */
+const FOOD_SERVICE_ANALYSIS_PROMPT = `
+  PERSONA: Você é o Auditor-Chefe do Método Delivery Seguro, treinado pelo Dr. Glauber.
+  Sua função é realizar uma auditoria de risco jurídico-operacional em empresas de Food Service.
+  Você não é um assistente comum; você é um estrategista que identifica passivos antes que eles se tornem execuções judiciais.
+
+  BASE CONTEXTUAL: Suas respostas devem ser fundamentadas nos protocolos de:
+  - Blindagem Patrimonial: (Uso de Holding e isolamento de ativos).
+  - Engenharia Trabalhista: (Uso de Contratos Intermitentes, Logística Civil e Termos de Desconexão).
+  - Compliance de Segurança: (Normas de GLP, Insalubridade via LTCAT e Fichas de EPI).
+
+  REGRAS DE OURO DA ANÁLISE:
+  1. Inversão do Ônus da Prova: Parta do princípio que "Fato não provado documentalmente é fato inexistente".
+     Se o usuário marcou uma alternativa de risco intermediário ou grave, ele NÃO possui a prova, logo, ele já perdeu a causa.
+  2. Risco de Caixa: Relacione a falha jurídica diretamente com a perda de lucro e risco de penhora online (Bacenjud).
+  3. Autoridade do Dr. Glauber: Sempre indique que a solução definitiva está nos instrumentos e minutas do Método Delivery Seguro.
+
+  ESTRUTURA OBRIGATÓRIA DO DIAGNÓSTICO:
+
+  1. STATUS DE SOBREVIVÊNCIA PATRIMONIAL
+  Classifique a empresa em uma das 3 zonas:
+  - ZONA SEGURA: Poucas falhas operacionais.
+  - ZONA DE VULNERABILIDADE: Falhas operacionais que geram passivos crescentes.
+  - ZONA DE COLAPSO: Risco iminente de perda de bens, interdição ou bloqueio de contas.
+
+  2. SCANNER DE BRECHAS TÉCNICAS (Relatório Item a Item)
+  Para cada resposta de risco intermediário ou grave do questionário de 39 pontos, gere:
+  - Falha Detectada: Nomeie o erro (ex: Exposição a Adicional de Periculosidade - Gás).
+  - O Passivo Oculto: Explique o "veneno" com dados concretos de custo.
+    Ex: "Sem o laudo de estanqueidade e distanciamento, o custo mensal aumenta em 30% por funcionário, retroativo a 5 anos."
+  - Comando de Correção: Indique a urgência na implementação do Método Delivery Seguro - MDS.
+
+  3. TOP 3: RISCOS DE "PORTA FECHADA"
+  Caso existam, identifique até 3 questões entre as 39 que, se não corrigidas em 24h, podem levar à:
+  - Interdição (Vigilância Sanitária / Gás / Bombeiros)
+  - Bloqueio total de contas (Trabalhista sem prova / Bacenjud)
+
+  4. PARECER EXECUTIVO FINAL
+  Um texto curto, direto e grave, reforçando que o empresário está "administrando no susto" ou
+  "ligado no apagar incêndio", o que custa deveras mais caro, e precisa da Mentoria de Implementação
+  do Método Delivery Seguro (MDS) para utilizar urgentemente e da forma correta as minutas de blindagem.
+
+  REQUISITOS DE QUALIDADE:
+  - Blindagem Profissional: Mencione que NÃO se trata de "conselhos jurídicos" genéricos.
+    Você apenas audita o cumprimento de processos estabelecidos após respostas genéricas do usuário
+    e que isto "não dispensa consulta de um advogado de sua confiança".
+  - Valorização do Produto: Identifique o problema e aponte que há solução específica no MDS.
+  - Foco em Prova: Em 98% dos casos diagnosticados, a prova é dever do empresário — sem prova, perde o processo.
+  - Linguagem de Comandante: Tom de "despacho executivo", eliminando qualquer "vício de IA" que pareça amador ou filosófico.
+  - Sem markdown (sem #, **, etc.). Utilize títulos em maiúsculas e seções bem destacadas.
+  - Texto entre 1000 e 2000 palavras, dependendo da quantidade de brechas identificadas.
+`;
+
+/**
  * Prepares user data for AI analysis
  */
 function prepareAnalysisData(input: AIAnalysisInput): string {
@@ -143,7 +199,12 @@ export async function generateAIAnalysis(input: AIAnalysisInput): Promise<string
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(input),
+      body: JSON.stringify({
+        area: input.area,
+        responses: input.responses,
+        totalScore: input.totalScore,
+        urgencyLevel: input.urgencyLevel,
+      }),
     });
 
     if (!response.ok) {
@@ -158,6 +219,9 @@ export async function generateAIAnalysis(input: AIAnalysisInput): Promise<string
 
         // Prepare data for fallback analysis
         const analysisData = prepareAnalysisData(input);
+        if (input.area.id === 'food_service') {
+          return generateFoodServiceReport(input, analysisData);
+        }
         return generateStructuredReport(input, analysisData);
       }
 
@@ -176,6 +240,9 @@ export async function generateAIAnalysis(input: AIAnalysisInput): Promise<string
     console.log('💡 Configure your backend server to handle AI analysis');
 
     const analysisData = prepareAnalysisData(input);
+    if (input.area.id === 'food_service') {
+      return generateFoodServiceReport(input, analysisData);
+    }
     return generateStructuredReport(input, analysisData);
   }
 }
@@ -233,6 +300,234 @@ function generateStructuredReport(
   report += `Relatório gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}\n`;
 
   return report;
+}
+
+/**
+ * Generates a structured report specifically for Food Service area
+ * Following the "Método Delivery Seguro" audit format
+ */
+function generateFoodServiceReport(
+  input: AIAnalysisInput, analysisData: string
+): string {
+  const { area, responses, totalScore, urgencyLevel } = input;
+
+  // Count risk responses (non-zero points)
+  let highRiskCount = 0;
+  let mediumRiskCount = 0;
+
+  responses.forEach(r => {
+    const question = area.questions.find(q => q.id === r.questionId);
+    if (!question || question.type === 'textarea') return;
+    if (question.type === 'radio' && typeof r.answer === 'string') {
+      const option = question.options?.find(opt => opt.value === r.answer);
+      const pts = option?.points || 0;
+      if (pts >= 25) highRiskCount++;
+      else if (pts >= 10) mediumRiskCount++;
+    }
+  });
+
+  // Determine zone
+  let zone: string;
+  let zoneDesc: string;
+  if (highRiskCount >= 8 || totalScore >= 400) {
+    zone = 'ZONA DE COLAPSO';
+    zoneDesc = 'Risco iminente de perda de bens, interdição ou bloqueio de contas. A empresa opera sem blindagem em áreas críticas.';
+  } else if (highRiskCount >= 3 || totalScore >= 200) {
+    zone = 'ZONA DE VULNERABILIDADE';
+    zoneDesc = 'Falhas operacionais que geram passivos crescentes. Existem brechas que podem ser exploradas em fiscalizações ou processos trabalhistas.';
+  } else {
+    zone = 'ZONA SEGURA';
+    zoneDesc = 'Poucas falhas operacionais detectadas. A empresa demonstra boa gestão documental, mas deve manter a vigilância contínua.';
+  }
+
+  let report = `AUDITORIA DE RISCO JURÍDICO-OPERACIONAL - MÉTODO DELIVERY SEGURO\n`;
+  report += `Empresa de Food Service\n`;
+  report += `Data: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}\n\n`;
+
+  report += `AVISO LEGAL: Este diagnóstico NÃO constitui conselho jurídico. Trata-se de auditoria de cumprimento de processos operacionais com base nas respostas fornecidas. Não dispensa consulta de um advogado de sua confiança.\n\n`;
+
+  // 1. STATUS DE SOBREVIVÊNCIA PATRIMONIAL
+  report += `1. STATUS DE SOBREVIVÊNCIA PATRIMONIAL\n\n`;
+  report += `Classificação: ${zone}\n\n`;
+  report += `${zoneDesc}\n\n`;
+  report += `Pontuação de risco total: ${totalScore} pontos\n`;
+  report += `Brechas de alto risco: ${highRiskCount}\n`;
+  report += `Brechas de risco intermediário: ${mediumRiskCount}\n\n`;
+
+  // 2. SCANNER DE BRECHAS TÉCNICAS
+  report += `2. SCANNER DE BRECHAS TÉCNICAS\n\n`;
+
+  const eixoLabels: Record<string, string> = {
+    '1': 'PATRIMONIAL E SOCIETÁRIO',
+    '2': 'VIGILÂNCIA, SEGURANÇA E EPI',
+    '3': 'CONSUMERISTA E DIGITAL',
+    '4': 'TRABALHISTA E ENGENHARIA DE PESSOAL',
+  };
+
+  function getEixo(questionId: string): string {
+    const num = parseInt(questionId.replace('fs_', ''));
+    if (num <= 9) return '1';
+    if (num <= 17) return '2';
+    if (num <= 23) return '3';
+    return '4';
+  }
+
+  let currentEixo = '';
+  let breachFound = false;
+
+  responses.forEach(r => {
+    const question = area.questions.find(q => q.id === r.questionId);
+    if (!question || question.type === 'textarea') return;
+
+    if (question.type === 'radio' && typeof r.answer === 'string') {
+      const option = question.options?.find(opt => opt.value === r.answer);
+      const pts = option?.points || 0;
+
+      if (pts > 0) {
+        breachFound = true;
+        const eixo = getEixo(question.id);
+        if (eixo !== currentEixo) {
+          currentEixo = eixo;
+          report += `--- EIXO ${eixo}: ${eixoLabels[eixo]} ---\n\n`;
+        }
+
+        const severity = pts >= 25 ? 'ALTO RISCO' : 'RISCO INTERMEDIÁRIO';
+        report += `FALHA DETECTADA [${severity}]: ${question.text}\n`;
+        report += `Situação informada: ${option?.label}\n`;
+        report += `Passivo Oculto: ${getFoodServicePassivo(question.id, r.answer)}\n`;
+        report += `Comando de Correção: Implementação urgente do protocolo correspondente do Método Delivery Seguro (MDS).\n\n`;
+      }
+    }
+  });
+
+  if (!breachFound) {
+    report += `Nenhuma brecha técnica significativa detectada. A operação demonstra bom nível de conformidade.\n\n`;
+  }
+
+  // Narrative sections
+  const narrativeIds = ['fs_9', 'fs_17', 'fs_23', 'fs_39'];
+  const narrativeLabels = ['Relato Societário/Patrimonial', 'Relato Sanitário e Técnico', 'Relato Consumerista', 'Relato Trabalhista'];
+  narrativeIds.forEach((id, idx) => {
+    const nr = responses.find(r => r.questionId === id);
+    if (nr && typeof nr.answer === 'string' && nr.answer.trim()) {
+      report += `${narrativeLabels[idx].toUpperCase()}:\n"${nr.answer}"\n\n`;
+    }
+  });
+
+  // 3. TOP 3 RISCOS DE "PORTA FECHADA"
+  report += `3. TOP 3: RISCOS DE "PORTA FECHADA"\n\n`;
+
+  const criticalQuestions = ['fs_10', 'fs_13', 'fs_14', 'fs_25', 'fs_28', 'fs_11', 'fs_24'];
+  const criticalFindings: { question: string; label: string; reason: string }[] = [];
+
+  criticalQuestions.forEach(qId => {
+    const r = responses.find(r => r.questionId === qId);
+    const q = area.questions.find(q => q.id === qId);
+    if (r && q && q.type === 'radio' && typeof r.answer === 'string') {
+      const opt = q.options?.find(o => o.value === r.answer);
+      if (opt && opt.points >= 25) {
+        criticalFindings.push({
+          question: q.text,
+          label: opt.label,
+          reason: getFoodServiceCriticalReason(qId),
+        });
+      }
+    }
+  });
+
+  if (criticalFindings.length > 0) {
+    criticalFindings.slice(0, 3).forEach((cf, idx) => {
+      report += `${idx + 1}. ${cf.question}\n`;
+      report += `   Situação: ${cf.label}\n`;
+      report += `   Risco: ${cf.reason}\n\n`;
+    });
+  } else {
+    report += `Nenhum risco crítico de "porta fechada" identificado com as respostas fornecidas.\n\n`;
+  }
+
+  // 4. PARECER EXECUTIVO FINAL
+  report += `4. PARECER EXECUTIVO FINAL\n\n`;
+
+  if (zone === 'ZONA DE COLAPSO') {
+    report += `ALERTA MÁXIMO: Sua operação está em estado de COLAPSO jurídico-operacional. `;
+    report += `Você está administrando no "apagar incêndio" — e cada incêndio custa patrimônio, não apenas dinheiro. `;
+    report += `Com ${highRiskCount} brechas de alto risco detectadas, qualquer fiscalização surpresa, reclamação trabalhista ou auto de infração pode resultar em interdição, bloqueio de contas via Bacenjud ou penhora de bens pessoais. `;
+    report += `A implementação IMEDIATA da Mentoria do Método Delivery Seguro (MDS) com as minutas de blindagem é a única alternativa para estancar a hemorragia de passivos ocultos.\n\n`;
+  } else if (zone === 'ZONA DE VULNERABILIDADE') {
+    report += `ATENÇÃO: Sua empresa opera com brechas que geram passivos silenciosos. `;
+    report += `Você pode não sentir o impacto hoje, mas cada mês sem correção é um mês a mais de retroativo acumulando. `;
+    report += `Lembre-se: em 98% dos casos diagnosticados, a prova é dever do empresário — sem prova, perde o processo. `;
+    report += `A Mentoria de Implementação do Método Delivery Seguro (MDS) oferece os instrumentos e minutas de blindagem necessários para corrigir cada brecha identificada.\n\n`;
+  } else {
+    report += `Sua operação demonstra bom nível de organização jurídico-operacional. `;
+    report += `Mantenha a vigilância contínua e a atualização periódica dos documentos e protocolos. `;
+    report += `O Método Delivery Seguro (MDS) pode auxiliar na manutenção e aprimoramento dos processos já implementados.\n\n`;
+  }
+
+  report += `IMPORTANTE: Este diagnóstico tem caráter de auditoria operacional e NÃO substitui parecer jurídico formal. `;
+  report += `Para uma avaliação completa e implementação dos protocolos de blindagem, procure a orientação do Dr. Glauber `;
+  report += `e a Mentoria do Método Delivery Seguro (MDS). Consulte sempre um advogado de sua confiança.\n\n`;
+
+  report += `---\n`;
+  report += `Auditoria realizada em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}\n`;
+  report += `Método Delivery Seguro - Auditoria de Risco Jurídico-Operacional\n`;
+
+  return report;
+}
+
+function getFoodServicePassivo(questionId: string, answer: string): string {
+  const passivos: Record<string, string> = {
+    'fs_1': 'Bens pessoais totalmente expostos à execução judicial. Qualquer reclamação trabalhista ou fiscal pode resultar em penhora de veículos, imóveis e contas pessoais via Bacenjud.',
+    'fs_2': 'Ausência de critério de haveres pode liquidar o caixa em caso de saída de sócio, inviabilizando a continuidade do negócio.',
+    'fs_3': 'Ex-sócio pode abrir concorrente direto, levando clientes, funcionários e know-how sem qualquer penalidade contratual.',
+    'fs_4': 'Risco de perda do nome comercial e notificação extrajudicial de terceiros que registrarem a marca primeiro no INPI.',
+    'fs_5': 'Em caso de morte do sócio principal, a empresa entra em inventário judicial e a operação pode ficar travada por meses ou anos.',
+    'fs_6': 'Contrato de locação sem proteção pode resultar em despejo em caso de venda do imóvel, com perda total do fundo de comércio.',
+    'fs_7': 'Ausência de seguro estruturado compromete a liquidez da empresa em caso de afastamento ou falecimento do sócio-chave.',
+    'fs_8': 'Sem contrato formal com fornecedores, não há base jurídica para cobrar multa por atraso na entrega, prejudicando a operação.',
+    'fs_10': 'Armazenamento irregular de GLP gera risco de adicional de periculosidade de 30% sobre o salário de cada funcionário, retroativo a 5 anos. Risco adicional de interdição pelo Corpo de Bombeiros.',
+    'fs_11': 'Sem ficha de EPI com CA, o empresário perde 100% dos processos de insalubridade/periculosidade. O ônus da prova é do empregador.',
+    'fs_12': 'Ausência de registro de treinamento transfere toda a responsabilidade de acidentes com equipamentos para o empregador.',
+    'fs_13': 'Contato dérmico com químicos industriais sem EPI certificado gera adicional de insalubridade de 20% a 40%, retroativo.',
+    'fs_14': 'Ambiente acima do limite legal de calor sem laudo IBUTG gera insalubridade obrigatória. Custo acumulado pode ultrapassar R$ 50.000 por funcionário em 5 anos.',
+    'fs_15': 'Recebimento improvisado de fiscal pode resultar em assinatura de auto de infração sem contestação, multas desnecessárias e interdição.',
+    'fs_16': 'Ausência de checklist documentado elimina a possibilidade de comprovar boas práticas em caso de intoxicação alimentar ou fiscalização.',
+    'fs_18': 'Sem protocolo de Marco de Entrega, cada chargeback é prejuízo direto e irrecuperável, podendo representar milhares de reais mensais.',
+    'fs_19': 'Diferença de preço sem aviso claro configura publicidade enganosa (CDC), sujeitando a empresa a multas do Procon.',
+    'fs_20': 'Ausência de LGPD expõe a empresa a multas de até 2% do faturamento e processos individuais por vazamento de dados.',
+    'fs_21': 'Respostas emocionais a avaliações negativas podem configurar dano moral reverso, além de deteriorar a reputação digital.',
+    'fs_22': 'Ausência de critério para devolução gera prejuízo operacional e risco sanitário ao aceitar produtos com lacre violado.',
+    'fs_24': 'Laudos LTCAT, PGR e PCMSO desatualizados ou inexistentes significam derrota automática em qualquer processo de insalubridade/periculosidade.',
+    'fs_25': 'Pagamento de diárias sem contrato gera vínculo empregatício automático com todos os encargos retroativos (FGTS, INSS, férias, 13º).',
+    'fs_26': 'Banco de horas sem anuência sindical é nulo. Todas as horas compensadas podem ser cobradas como extras com adicional de 50% a 100%.',
+    'fs_27': 'Intervalo intrajornada não comprovado gera condenação ao pagamento do período integral como hora extra, com adicional.',
+    'fs_28': 'Sem registro de ponto, o juiz aceita a jornada informada pelo empregado. Risco de condenação em horas extras fabricadas.',
+    'fs_29': 'Grupo de WhatsApp com cobranças fora do horário configura "tempo à disposição", gerando horas extras e sobreaviso.',
+    'fs_30': 'Pagamento sem comprovante vinculado ao CPF do funcionário é considerado como não realizado. Risco de pagar salário duas vezes.',
+    'fs_31': 'Motoboys sem contrato adequado geram vínculo empregatício com adicional de periculosidade de 30%, retroativo.',
+    'fs_32': 'ASO desatualizado invalida toda a defesa em processos de doença ocupacional ou acidente de trabalho.',
+    'fs_33': 'Uso de imagem de funcionário sem autorização formal gera direito a indenização por violação de direito de imagem.',
+    'fs_34': 'Sem termo de custódia, não é possível descontar danos em equipamentos da rescisão do funcionário.',
+    'fs_35': 'Senhas compartilhadas sem termo de sigilo expõem a empresa a fraudes internas sem possibilidade de responsabilização.',
+    'fs_36': 'Sem regulamento interno protocolado, advertências e demissões por justa causa podem ser revertidas judicialmente.',
+    'fs_37': 'Sem termo de uso de veículo, todas as multas e danos ficam como custo da empresa sem possibilidade de desconto.',
+    'fs_38': 'Sem inventário periódico e termo de responsabilidade, desvios de estoque não podem ser responsabilizados individualmente.',
+  };
+
+  return passivos[questionId] || 'Esta falha operacional gera passivos ocultos que podem ser cobrados retroativamente em processos judiciais. Implemente o protocolo correspondente do MDS.';
+}
+
+function getFoodServiceCriticalReason(questionId: string): string {
+  const reasons: Record<string, string> = {
+    'fs_10': 'INTERDIÇÃO IMEDIATA: Armazenamento irregular de GLP pode levar a interdição pelo Corpo de Bombeiros e risco de explosão.',
+    'fs_11': 'DERROTA PROCESSUAL AUTOMÁTICA: Sem ficha de EPI, o empresário perde 100% dos processos trabalhistas de insalubridade.',
+    'fs_13': 'RISCO À SAÚDE: Contato com químicos sem proteção pode gerar doença ocupacional e interdição pela vigilância.',
+    'fs_14': 'INSALUBRIDADE OBRIGATÓRIA: Sem laudo IBUTG, não há como contestar pedidos de adicional de insalubridade por calor.',
+    'fs_24': 'SEM DEFESA: Laudos trabalhistas inexistentes eliminam qualquer possibilidade de defesa em processos de insalubridade/periculosidade.',
+    'fs_25': 'VÍNCULO AUTOMÁTICO: Pagamento de diárias sem contrato gera vínculo empregatício com encargos retroativos de até 5 anos.',
+    'fs_28': 'HORAS EXTRAS ILIMITADAS: Sem ponto, o juiz aceita a jornada alegada pelo empregado, podendo gerar condenações milionárias.',
+  };
+  return reasons[questionId] || 'Risco crítico que pode levar à interdição ou bloqueio de contas se não corrigido imediatamente.';
 }
 
 function generateExecutiveSummary(
