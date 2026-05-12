@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Scale, Info, FileCheck, Shield, Users, FileText, TrendingUp } from 'lucide-react';
+import { Scale, Info, FileCheck, Shield, Users, FileText, TrendingUp, Building2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { analyticsService } from '@/lib/data-service';
 import { LawyersCarousel } from './LawyersCarousel';
@@ -94,6 +94,35 @@ export function LandingPage({ onStart }: LandingPageProps) {
               <Info className="mr-2" />
               Como Funciona
             </Button>
+          </div>
+
+          {/* Category Buttons */}
+          <div className="flex gap-6 justify-center flex-wrap mt-10">
+            <button
+              onClick={onStart}
+              className="flex items-center gap-4 bg-white/10 backdrop-blur-md border-2 border-white/25 rounded-2xl px-8 py-5 text-left hover:bg-white/20 hover:border-[oklch(0.75_0.12_85)]/60 hover:shadow-[0_10px_40px_rgba(255,215,0,0.15)] transition-all group cursor-pointer max-w-md"
+            >
+              <div className="bg-[oklch(0.75_0.12_85)]/20 p-3 rounded-xl group-hover:bg-[oklch(0.75_0.12_85)]/30 transition-colors flex-shrink-0">
+                <Users className="w-8 h-8 text-[oklch(0.75_0.12_85)]" />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-white uppercase tracking-wide mb-1">Para Cidadãos</h3>
+                <p className="text-sm text-white/70 leading-snug">Diagnóstico gratuito em várias áreas do direito</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { }}
+              className="flex items-center gap-4 bg-white/10 backdrop-blur-md border-2 border-white/25 rounded-2xl px-8 py-5 text-left hover:bg-white/20 hover:border-[oklch(0.75_0.12_85)]/60 hover:shadow-[0_10px_40px_rgba(255,215,0,0.15)] transition-all group cursor-pointer max-w-md opacity-90"
+            >
+              <div className="bg-[oklch(0.75_0.12_85)]/20 p-3 rounded-xl group-hover:bg-[oklch(0.75_0.12_85)]/30 transition-colors flex-shrink-0">
+                <Building2 className="w-8 h-8 text-[oklch(0.75_0.12_85)]" />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-white uppercase tracking-wide mb-1">Para Empresas - Food Service</h3>
+                <p className="text-sm text-white/70 leading-snug">Diagnóstico jurídico gratuito para empresas de Food Service - restaurantes, deliverys, pizzarias, lanchonetes e afins</p>
+              </div>
+            </button>
           </div>
         </div>
 
